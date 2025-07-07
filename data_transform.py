@@ -7,7 +7,7 @@ Created on Thu Jul  3 13:25:27 2025
 
 # TODO
 # make unit change possible DONE
-# include standard deviation
+# include standard deviation #Bug: unit transformation is at wrong position
 # try to have excel columns of output nicely formated
 # make appending data possible (rows and cloumns)
 # make it possible to use costum IDs in input data together with an extra table that related costum IDs to TRTNO
@@ -29,7 +29,7 @@ template_sheet = "phenology"
 
 #provide unit change information (optional)
 #provide a dictionary of all variables that need a unit change and 
-#the corresponding factors to tranform from the input unit to the outout unit 
+#the corresponding factors to tranform from the input unit to the output unit 
 #(e.g.plant_height: input cm, output meter, provide "PHTD":0.01)
 
 unit_change = {"PHTD":0.01}
@@ -60,20 +60,34 @@ common_cols = input_data.columns.intersection(template_data.columns)
 if summarize_samples and "TIME" in common_cols:
     input_data["TIME"] = pd.to_timedelta(input_data["TIME"].astype(str))
 
-#subsetting and summarizing data
+#subsetting and summarizing data, computing standard deviation
 
 input_data_subset = input_data[common_cols]
 
 if summarize_samples:
-    input_data_subset = input_data_subset.groupby(["TRTNO", 'DATE']).mean().reset_index() #reset index avoids merged cells for same TRTNO
+    input_data_subset = input_data_subset.groupby(["TRTNO", 'DATE']).agg(['mean', 'std']).reset_index() #reset index avoids merged cells for same TRTNO
+
+new_columns = []
+for col in input_data_subset.columns:
+    if col[1] == '':  # This is a grouping column like ('TRTNO', '') or ('DATE', '')
+        new_columns.append(col[0])
+    elif col[1] == 'mean':
+        new_columns.append(col[0])  # Keep original name
+    elif col[1] == 'std':
+        new_columns.append(col[0] + 'S')  # Append 'S' for std
+
+input_data_subset.columns = new_columns
 
 #transforming units
+
 for entri in unit_change:
     input_data_subset[entri] = input_data_subset[entri]*unit_change[entri]
 
 #export the icasa_data back into the excel file
 
-template_data[common_cols] = input_data_subset[common_cols]
+common_cols_2 = input_data_subset.columns.intersection(template_data.columns) #needed to include standard deviation if intended
+
+template_data[common_cols_2] = input_data_subset[common_cols_2]
 
 with pd.ExcelWriter(template_file, mode='a', if_sheet_exists='replace') as writer:
     template_data.to_excel(writer, sheet_name=template_sheet, index=False)
