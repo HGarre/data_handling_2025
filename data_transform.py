@@ -62,7 +62,7 @@ if summarize_samples and "TIME" in common_cols:
 
 #subsetting data 
 
-input_data_subset = input_data[common_cols]
+input_data_subset = input_data.loc[:,common_cols]
 
 #transforming units
 
