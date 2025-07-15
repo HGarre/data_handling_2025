@@ -12,10 +12,10 @@ Created on Thu Jul  3 13:25:27 2025
 # make appending data possible (rows and cloumns)
 # make it possible to use costum IDs in input data together with an extra table that related costum IDs to TRTNO
 
-#Code copy data from a data sheet used for data input into a ICASA data template
-#The data file from where the data is copied from needs to have a column 
-#that specifies the ODMF number assigned to the point where the sample was taken
-#All columns that should be transferred need to have the same name as in the ICASA templete
+#Code to copy point-based data from a data sheet used for data input into a ICASA data template.
+#The data file from where the data is copied needs to have a column 
+#that specifies the ODMF number assigned to the point where the sample was taken.
+#All columns that should be transferred need to have the same variable name as in the ICASA templete.
 
 
 
@@ -30,7 +30,7 @@ template_sheet = "phenology"
 #provide unit change information (optional)
 #provide a dictionary of all variables that need a unit change and 
 #the corresponding factors to tranform from the input unit to the output unit 
-#(e.g.plant_height: input cm, output meter, provide "PHTD":0.01)
+#(e.g.plant_height: input centimeter, output meter, provide "PHTD":0.01)
 
 unit_change = {"PHTD":0.01}
 
@@ -60,9 +60,16 @@ common_cols = input_data.columns.intersection(template_data.columns)
 if summarize_samples and "TIME" in common_cols:
     input_data["TIME"] = pd.to_timedelta(input_data["TIME"].astype(str))
 
-#subsetting and summarizing data, computing standard deviation
+#subsetting data 
 
 input_data_subset = input_data[common_cols]
+
+#transforming units
+
+for entri in unit_change:
+    input_data_subset[entri] = input_data_subset[entri]*unit_change[entri]
+
+#summarizing data and computing standard deviation
 
 if summarize_samples:
     input_data_subset = input_data_subset.groupby(["TRTNO", 'DATE']).agg(['mean', 'std']).reset_index() #reset index avoids merged cells for same TRTNO
@@ -77,11 +84,6 @@ for col in input_data_subset.columns:
         new_columns.append(col[0] + 'S')  # Append 'S' for std
 
 input_data_subset.columns = new_columns
-
-#transforming units
-
-for entri in unit_change:
-    input_data_subset[entri] = input_data_subset[entri]*unit_change[entri]
 
 #export the icasa_data back into the excel file
 
