@@ -8,8 +8,7 @@ Created on Thu Jul  3 13:25:27 2025
 # TODO
 # DONE make unit change possible DONE
 # DONE include standard deviation #Bug: unit transformation is at wrong position DONE
-# make appending data possible (rows and colums(?))
-#   maybe avoid using common cols but use a panda mapping that takes all columns from template data and overwrites machting columns from input data (take care that appending rows stil works fine)
+# DONE make appending data possible (rows and colums)
 # try to have excel columns of output nicely formated
 # make it possible to use costum IDs and variable names in input data together with an extra table (mapping) that related costum IDs to TRTNO and variable names to ICASA codes
 
@@ -46,10 +45,12 @@ unit_change = {}
 
 
 #specify whether you want to overwrite existing values in the template_file with values from the input file
-#this can be used if wrong values have been imported below. Choose False if no data from the template file should be lost.
-#feature not yet implemented
+#this can be used if wrong values have been imported before. 
+#Be aware out that if some (wrong) values are stored in template, they will not be overwritten by importing empty lines.
+# In this case you need to delete the value manually. This is also true for previously calcualted standard deviations.
+#Choose False if no data from the template file should be lost.
 
-overwrite_rows = False
+overwrite_values = True
 
 
 
@@ -113,8 +114,12 @@ data_cols = [col for col in common_cols_2 if col not in keys]
 
 merged_data = pd.merge(template_data, input_data_subset, on = keys, how = 'outer', suffixes = ("_t", "_i"))
 
-for col in data_cols:
-    merged_data[col] = merged_data[f"{col}_t"].combine_first(merged_data[f"{col}_i"]) #creates combination columns that have the original names (stored in data_cols), containing value from template, only if template was no value, use value from input
+if overwrite_values:
+    for col in data_cols:
+        merged_data[col] = merged_data[f"{col}_i"].combine_first(merged_data[f"{col}_t"]) #creates combination columns that have the original names (stored in data_cols), containing value from input, only if input has no value, use value from template
+else:
+    for col in data_cols:
+        merged_data[col] = merged_data[f"{col}_t"].combine_first(merged_data[f"{col}_i"]) #creates combination columns that have the original names (stored in data_cols), containing value from template, only if template was no value, use value from input
     
 final_data = merged_data[template_data.columns] #merged data contains combination column and the columns with indexes, keep only keys and combination columns and empty columns from template sheet
 
