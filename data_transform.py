@@ -10,13 +10,13 @@ Created on Thu Jul  3 13:25:27 2025
 # DONE include standard deviation #Bug: unit transformation is at wrong position DONE
 # DONE make appending data possible (rows and colums)
 # DONE try to have excel columns of output nicely formated
-# make it possible to use costum IDs and variable names in input data together with an extra table (mapping) that related costum IDs to TRTNO and variable names to ICASA codes
+# DONE make it possible to use costum IDs and variable names in input data together with an extra table (mapping) that related costum IDs to TRTNO and variable names to ICASA codes
 # construct edge cases to test the script for robustness
 
 #Code to copy point-based data from a data sheet used for data input into a ICASA data template.
 #The data file from where the data is copied needs to have a column 
-#that specifies the ODMF number assigned to the point where the sample was take,named TRTNO
-#All columns that should be transferred need to have the same variable name as in the ICASA templete.
+#that specifies the ODMF number assigned to the point where the sample was taken
+#All columns that should be transferred need to have the same variable name as in the ICASA templete or a mapping must be provided
 #if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
@@ -27,6 +27,13 @@ input_sheet = "Tabelle2"
 template_file = "H:/Data/test_template.xlsx"
 template_sheet = "Tabelle1"
 
+# specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
+#if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
+# it can contain more variable names than used in the sheets you want to transform
+
+use_mapping = True
+mapping_file = "H:/Data/test_mapping.xlsx"
+mapping_sheet = "Tabelle1"
 
 # specify whether data should be summarized over tecnical replicates (RP) on the same DATE, 
 # If you choose to summarize:
@@ -63,6 +70,14 @@ import pandas as pd
 input_data = pd.read_excel(input_file, sheet_name = input_sheet)
 
 template_data = pd.read_excel(template_file, sheet_name=template_sheet)
+
+mapping = pd.read_excel(mapping_file, sheet_name=mapping_sheet)
+
+#rename input data columns
+
+if use_mapping:
+    rename_dict = dict(zip(mapping.iloc[:,1],mapping.iloc[:,0]))
+    input_data = input_data.rename(columns=rename_dict)
 
 #checking for common columns
 
@@ -126,8 +141,6 @@ else:
 final_data = merged_data[template_data.columns] #merged data contains combination column and the columns with indexes, keep only keys and combination columns and empty columns from template sheet
 
 # write the new template into the old excel sheet (and format the columns)
-
-from openpyxl.styles import numbers
 
 with pd.ExcelWriter(template_file, mode='a', if_sheet_exists='replace', engine = "openpyxl") as writer:
     final_data.to_excel(writer, sheet_name=template_sheet, index=False)
