@@ -9,13 +9,15 @@ Created on Thu Jul  3 13:25:27 2025
 # DONE make unit change possible DONE
 # DONE include standard deviation #Bug: unit transformation is at wrong position DONE
 # DONE make appending data possible (rows and colums)
-# try to have excel columns of output nicely formated
+# DONE try to have excel columns of output nicely formated
 # make it possible to use costum IDs and variable names in input data together with an extra table (mapping) that related costum IDs to TRTNO and variable names to ICASA codes
+# construct edge cases to test the script for robustness
 
 #Code to copy point-based data from a data sheet used for data input into a ICASA data template.
 #The data file from where the data is copied needs to have a column 
 #that specifies the ODMF number assigned to the point where the sample was take,named TRTNO
 #All columns that should be transferred need to have the same variable name as in the ICASA templete.
+#if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
 input_file = "H:/Data/test_input.xlsx"
@@ -125,6 +127,24 @@ final_data = merged_data[template_data.columns] #merged data contains combinatio
 
 # write the new template into the old excel sheet (and format the columns)
 
-with pd.ExcelWriter(template_file, mode='a', if_sheet_exists='replace') as writer:
+from openpyxl.styles import numbers
+
+with pd.ExcelWriter(template_file, mode='a', if_sheet_exists='replace', engine = "openpyxl") as writer:
     final_data.to_excel(writer, sheet_name=template_sheet, index=False)
     
+    wb  = writer.book
+    ws = writer.sheets[template_sheet]
+    
+    header = [cell.value for cell in ws[1]]
+    
+    
+    if "DATE" in common_cols_2:
+        date_col_idx = header.index("DATE") + 1 # openpyxl columns are 1-based
+        for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx):
+            row[0].number_format = "yyyy-mm-dd"
+    
+    if "TIME" in common_cols_2:
+        time_col_idx = header.index("TIME") + 1
+        for row in ws.iter_rows(min_row=2, min_col=time_col_idx, max_col=time_col_idx):
+            row[0].number_format = "hh:mm:ss"
+        
