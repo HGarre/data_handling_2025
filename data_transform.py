@@ -20,20 +20,20 @@ Created on Thu Jul  3 13:25:27 2025
 #if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
-input_file = "H:/Data/test_input.xlsx"
-input_sheet = "Tabelle2"
+input_file = "H:/Data/phenology_height_2025.xlsx"
+input_sheet = "all"
 
 #provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
-template_file = "H:/Data/test_template.xlsx"
-template_sheet = "Tabelle1"
+template_file = "H:/Data/FORMULA_SP5_crop_measurement_3.xlsx"
+template_sheet = "plant_height"
 
 # specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
 #if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
 # it can contain more variable names than used in the sheets you want to transform
 
-use_mapping = True
-mapping_file = "H:/Data/test_mapping.xlsx"
-mapping_sheet = "Tabelle1"
+use_mapping = False
+mapping_file = ""
+mapping_sheet = ""
 
 # specify whether data should be summarized over tecnical replicates (RP) on the same DATE, 
 # If you choose to summarize:
@@ -43,7 +43,7 @@ mapping_sheet = "Tabelle1"
 # if replicates are present but no summary is intended
 #    a column RP must specify replicate numbers both in the input and the template file
 
-summarize_samples = False
+summarize_samples = True
 
 #provide unit change information (optional)
 #provide a dictionary of all variables that need a unit change and 
@@ -59,7 +59,7 @@ unit_change = {}
 # In this case you need to delete the value manually. This is also true for previously calcualted standard deviations.
 #Choose False if no data from the template file should be lost.
 
-overwrite_values = True
+overwrite_values = False
 
 
 
@@ -71,11 +71,11 @@ input_data = pd.read_excel(input_file, sheet_name = input_sheet)
 
 template_data = pd.read_excel(template_file, sheet_name=template_sheet)
 
-mapping = pd.read_excel(mapping_file, sheet_name=mapping_sheet)
 
 #rename input data columns
 
 if use_mapping:
+    mapping = pd.read_excel(mapping_file, sheet_name=mapping_sheet)
     rename_dict = dict(zip(mapping.iloc[:,1],mapping.iloc[:,0]))
     input_data = input_data.rename(columns=rename_dict)
 
