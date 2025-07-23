@@ -20,12 +20,12 @@ Created on Thu Jul  3 13:25:27 2025
 #if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
-input_file = "H:/Data/phenology_height_2025.xlsx"
+input_file = "H:/Data/LAI_2025.xlsx"
 input_sheet = "all"
 
 #provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
 template_file = "H:/Data/FORMULA_SP5_crop_measurement_3.xlsx"
-template_sheet = "plant_height"
+template_sheet = "LAI"
 
 # specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
 #if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
@@ -100,7 +100,7 @@ for entri in unit_change:
 #summarizing data and computing standard deviation
 
 if summarize_samples:
-    input_data_subset = input_data_subset.groupby(["TRTNO", 'DATE']).agg(['mean', 'std']).reset_index() #reset index avoids merged cells for same TRTNO
+    input_data_subset = input_data_subset.groupby(["TRTNO", 'DATE']).agg(['mean', 'std', 'count']).reset_index() #reset index avoids merged cells for same TRTNO
 
     new_columns = []
     for col in input_data_subset.columns:
@@ -110,8 +110,15 @@ if summarize_samples:
             new_columns.append(col[0])  # Keep original name
         elif col[1] == 'std':
             new_columns.append(col[0] + 'S')  # Append 'S' for std
+        elif col[1] == 'count':
+            if "SPL_NO" not in new_columns: #just include the first occurence, assuming some for all variables (no NAs for just one variable in the same datasheet)
+                 new_columns.append("SPL_NO")
+            else:
+                new_columns.append("to_delete")
     
     input_data_subset.columns = new_columns
+    input_data_subset = input_data_subset.drop(columns = ["to_delete"])
+    
 
 common_cols_2 = input_data_subset.columns.intersection(template_data.columns) #needed to include standard deviation if intended and find correct keys
 
