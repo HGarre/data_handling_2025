@@ -20,20 +20,32 @@ Created on Thu Jul  3 13:25:27 2025
 #if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
-input_file = "H:/Data/LAI_2025.xlsx"
-input_sheet = "all"
+input_file = "H:/Data/test_input.xlsx"
+input_sheet = "Tabelle1"
 
 #provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
-template_file = "H:/Data/FORMULA_SP5_crop_measurement_3.xlsx"
-template_sheet = "LAI"
+template_file = "H:/Data/test_template.xlsx"
+template_sheet = "Tabelle1"
 
 # specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
 #if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
 # it can contain more variable names than used in the sheets you want to transform
 
-use_mapping = False
-mapping_file = ""
-mapping_sheet = ""
+use_mapping = True
+mapping_file = "H:/Data/test_mapping.xlsx"
+mapping_sheet = "variables"
+
+# specify whether you want to provide a custom-id to TRTNO table instead of using the ODMF treatment numbers in your input_file
+#if true, provide a mapping table that contains the TRTNO (ODMF number) in the first column and your ids in the second column
+# it can contain more ids than used in the sheets you want to transform
+# also provide the column name of your custom ID (string)
+
+use_custom_ids = True
+id_file = "H:/Data/test_mapping.xlsx"
+id_sheet = "ids"
+id_name = "id"
+
+
 
 # specify whether data should be summarized over tecnical replicates (RP) on the same DATE, 
 # If you choose to summarize:
@@ -72,12 +84,18 @@ input_data = pd.read_excel(input_file, sheet_name = input_sheet)
 template_data = pd.read_excel(template_file, sheet_name=template_sheet)
 
 
-#rename input data columns
+#rename input data columns and/or rows
 
 if use_mapping:
     mapping = pd.read_excel(mapping_file, sheet_name=mapping_sheet)
     rename_dict = dict(zip(mapping.iloc[:,1],mapping.iloc[:,0]))
     input_data = input_data.rename(columns=rename_dict)
+    
+if use_custom_ids:
+    ids = pd.read_excel(id_file, sheet_name = id_sheet)
+    rename_id_dict = dict(zip(ids.iloc[:,1], ids.iloc[:,0]))
+    input_data[id_name] = input_data[id_name].map(rename_id_dict)
+    input_data = input_data.rename(columns={id_name: "TRTNO"})
 
 #checking for common columns
 
