@@ -5,14 +5,6 @@ Created on Thu Jul  3 13:25:27 2025
 @author: garre
 """
 
-# TODO
-# DONE make unit change possible DONE
-# DONE include standard deviation #Bug: unit transformation is at wrong position DONE
-# DONE make appending data possible (rows and colums)
-# DONE try to have excel columns of output nicely formated
-# DONE make it possible to use costum IDs and variable names in input data together with an extra table (mapping) that related costum IDs to TRTNO and variable names to ICASA codes
-# construct edge cases to test the script for robustness
-
 #Code to copy point-based data from a data sheet used for data input into a ICASA data template.
 #The data file from where the data is copied needs to have a column 
 #that specifies the ODMF number assigned to the point where the sample was taken
@@ -21,7 +13,7 @@ Created on Thu Jul  3 13:25:27 2025
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
 input_file = "H:/Data/LAI_2025.xlsx"
-input_sheet = "Tabelle1"
+input_sheet = "all"
 
 #provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
 template_file = "H:/Data/FORMULA_point_data_2.xlsx"
@@ -35,8 +27,8 @@ use_mapping =False
 mapping_file = "H:/Data/test_mapping.xlsx"
 mapping_sheet = "variables"
 
-# specify whether you want to provide a custom-id to TRTNO table instead of using the ODMF treatment numbers in your input_file
-#if true, provide a mapping table that contains the TRTNO (ODMF number) in the first column and your ids in the second column
+# specify whether you want to provide a custom-id to treatment_number table instead of using the ODMF treatment numbers in your input_file
+#if true, provide a mapping table that contains the treatment_number (ODMF number) in the first column and your ids in the second column
 # it can contain more ids than used in the sheets you want to transform
 # also provide the column name of your custom ID (string)
 
@@ -47,10 +39,10 @@ id_name = "id"
 
 
 
-# specify whether data should be summarized over tecnical replicates (RP) on the same DATE, 
+# specify whether data should be summarized over tecnical replicates (RP) on the same date_of_measurement, 
 # If you choose to summarize:
 #   only columns containing numbers or time can be transferred
-#   a column "DATE" must be in the input data sheet, replicates can have any name
+#   a column "date_of_measurement" must be in the input data sheet, replicates can have any name
 #   standard deviation will be added if the column is included in the template
 # if replicates are present but no summary is intended
 #    a column RP must specify replicate numbers both in the input and the template file
@@ -96,7 +88,7 @@ if use_custom_ids:
     ids = pd.read_excel(id_file, sheet_name = id_sheet)
     rename_id_dict = dict(zip(ids.iloc[:,1], ids.iloc[:,0]))
     input_data[id_name] = input_data[id_name].map(rename_id_dict)
-    input_data = input_data.rename(columns={id_name: "TRTNO"})
+    input_data = input_data.rename(columns={id_name: "treatment_number"})
 
 #checking for common columns
 
@@ -104,8 +96,8 @@ common_cols = input_data.columns.intersection(template_data.columns)
 
 #transforming time column if applicable, in order to be summarized
 
-if summarize_samples and "TIME" in common_cols:
-    input_data["TIME"] = pd.to_timedelta(input_data["TIME"].astype(str))
+if summarize_samples and "time_of_measurement" in common_cols:
+    input_data["time_of_measurement"] = pd.to_timedelta(input_data["time_of_measurement"].astype(str))
 
 #subsetting data 
 
@@ -119,19 +111,19 @@ for entri in unit_change:
 #summarizing data and computing standard deviation
 
 if summarize_samples:
-    input_data_subset = input_data_subset.groupby(["TRTNO", 'DATE']).agg(['mean', 'std', 'count']).reset_index() #reset index avoids merged cells for same TRTNO
+    input_data_subset = input_data_subset.groupby(["treatment_number", 'date_of_measurement']).agg(['mean', 'std', 'count']).reset_index() #reset index avoids merged cells for same treatment_number
 
     new_columns = []
     for col in input_data_subset.columns:
-        if col[1] == '':  # This is a grouping column like ('TRTNO', '') or ('DATE', '')
+        if col[1] == '':  # This is a grouping column like ('treatment_number', '') or ('date_of_measurement', '')
             new_columns.append(col[0])
         elif col[1] == 'mean':
             new_columns.append(col[0])  # Keep original name
         elif col[1] == 'std':
-            new_columns.append(col[0] + 'S')  # Append 'S' for std
+            new_columns.append(col[0] + '_stdev')  # Append 'S' for std
         elif col[1] == 'count':
-            if "SPL_NO" not in new_columns: #just include the first occurence, assuming some for all variables (no NAs for just one variable in the same datasheet)
-                 new_columns.append("SPL_NO")
+            if "number_of_samples" not in new_columns: #just include the first occurence, assuming some for all variables (no NAs for just one variable in the same datasheet)
+                 new_columns.append("number_of_samples")
             else:
                 new_columns.append("to_delete")
     
@@ -144,14 +136,14 @@ common_cols_2 = input_data_subset.columns.intersection(template_data.columns) #n
 input_data_subset = input_data_subset[common_cols_2]
 
 # unite the template and input data
-if "DATE" and "RP" in common_cols_2:
-    keys = ["TRTNO", "DATE", "RP"]
+if "date_of_measurement" and "RP" in common_cols_2:
+    keys = ["treatment_number", "date_of_measurement", "RP"]
 elif "RP" in common_cols_2:
-    keys = ["TRTNO", "RP"]
-elif "DATE" in common_cols_2:
-    keys = ["TRTNO", "DATE"]
+    keys = ["treatment_number", "RP"]
+elif "date_of_measurement" in common_cols_2:
+    keys = ["treatment_number", "date_of_measurement"]
 else:
-    keys = ["TRTNO"]
+    keys = ["treatment_number"]
 
 data_cols = [col for col in common_cols_2 if col not in keys]
 
@@ -180,16 +172,16 @@ for r_idx, row in enumerate(dataframe_to_rows(final_data, index=False, header=Tr
 # get headers
 header = [cell.value for cell in ws[4]]
 
-# DATE column formatting
-if "DATE" in common_cols_2:
-    date_col_idx = header.index("DATE") + 1  # 1-based indexing
+# date_of_measurement column formatting
+if "date_of_measurement" in common_cols_2:
+    date_col_idx = header.index("date_of_measurement") + 1  # 1-based indexing
     for row in ws.iter_rows(min_row=5, min_col=date_col_idx, max_col=date_col_idx):
         row[0].number_format = "yyyy-mm-dd"
 
-# TIME column formatting
-if "TIME" in common_cols_2:
-    time_col_idx = header.index("TIME") + 1
+# time_of_measurement column formatting
+if "time_of_measurement" in common_cols_2:
+    time_col_idx = header.index("time_of_measurement") + 1
     for row in ws.iter_rows(min_row=5, min_col=time_col_idx, max_col=time_col_idx):
         row[0].number_format = "hh:mm:ss"
 
-       
+wb.save(template_file)       
