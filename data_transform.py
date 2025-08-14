@@ -12,12 +12,12 @@ Created on Thu Jul  3 13:25:27 2025
 #if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
-input_file = "H:/Data/LAI_2025.xlsx"
+input_file = "H:/Data/LI600_2025.xlsx"
 input_sheet = "all"
 
 #provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
 template_file = "H:/Data/FORMULA_point_data_2.xlsx"
-template_sheet = "LAI"
+template_sheet = "PORO_FLUORO"
 
 # specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
 #if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
@@ -128,7 +128,9 @@ if summarize_samples:
                 new_columns.append("to_delete")
     
     input_data_subset.columns = new_columns
-    input_data_subset = input_data_subset.drop(columns = ["to_delete"])
+    
+    if "to_delete" in input_data_subset.columns:
+        input_data_subset = input_data_subset.drop(columns = ["to_delete"])
     
 
 common_cols_2 = input_data_subset.columns.intersection(template_data.columns) #needed to include standard deviation if intended and find correct keys
