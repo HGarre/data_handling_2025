@@ -20,18 +20,18 @@ Created on Thu Jul  3 13:25:27 2025
 #if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
 
 #provide the complete path to the input data sheet (excel format) and sheet name within the workbook
-input_file = "H:/Data/test_input.xlsx"
+input_file = "H:/Data/LAI_2025.xlsx"
 input_sheet = "Tabelle1"
 
 #provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
-template_file = "H:/Data/test_template.xlsx"
-template_sheet = "Tabelle1"
+template_file = "H:/Data/FORMULA_point_data_2.xlsx"
+template_sheet = "LAI"
 
 # specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
 #if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
 # it can contain more variable names than used in the sheets you want to transform
 
-use_mapping = True
+use_mapping =False
 mapping_file = "H:/Data/test_mapping.xlsx"
 mapping_sheet = "variables"
 
@@ -40,7 +40,7 @@ mapping_sheet = "variables"
 # it can contain more ids than used in the sheets you want to transform
 # also provide the column name of your custom ID (string)
 
-use_custom_ids = True
+use_custom_ids = False
 id_file = "H:/Data/test_mapping.xlsx"
 id_sheet = "ids"
 id_name = "id"
@@ -76,13 +76,14 @@ overwrite_values = False
 
 
 import pandas as pd
+from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
-# imporating the data
+# imporating the data, excudong the top rows from the template
 
 input_data = pd.read_excel(input_file, sheet_name = input_sheet)
 
-template_data = pd.read_excel(template_file, sheet_name=template_sheet)
-
+template_data = pd.read_excel(template_file, sheet_name=template_sheet, skiprows=3)
 
 #rename input data columns and/or rows
 
@@ -167,22 +168,28 @@ final_data = merged_data[template_data.columns] #merged data contains combinatio
 
 # write the new template into the old excel sheet (and format the columns)
 
-with pd.ExcelWriter(template_file, mode='a', if_sheet_exists='replace', engine = "openpyxl") as writer:
-    final_data.to_excel(writer, sheet_name=template_sheet, index=False)
-    
-    wb  = writer.book
-    ws = writer.sheets[template_sheet]
-    
-    header = [cell.value for cell in ws[1]]
-    
-    
-    if "DATE" in common_cols_2:
-        date_col_idx = header.index("DATE") + 1 # openpyxl columns are 1-based
-        for row in ws.iter_rows(min_row=2, min_col=date_col_idx, max_col=date_col_idx):
-            row[0].number_format = "yyyy-mm-dd"
-    
-    if "TIME" in common_cols_2:
-        time_col_idx = header.index("TIME") + 1
-        for row in ws.iter_rows(min_row=2, min_col=time_col_idx, max_col=time_col_idx):
-            row[0].number_format = "hh:mm:ss"
-        
+# Load workbook and worksheet
+wb = load_workbook(template_file)
+ws = wb[template_sheet]
+
+# Write new data starting at row 4
+for r_idx, row in enumerate(dataframe_to_rows(final_data, index=False, header=True), start=4):
+    for c_idx, value in enumerate(row, start=1):
+        ws.cell(row=r_idx, column=c_idx, value=value)
+
+# get headers
+header = [cell.value for cell in ws[4]]
+
+# DATE column formatting
+if "DATE" in common_cols_2:
+    date_col_idx = header.index("DATE") + 1  # 1-based indexing
+    for row in ws.iter_rows(min_row=5, min_col=date_col_idx, max_col=date_col_idx):
+        row[0].number_format = "yyyy-mm-dd"
+
+# TIME column formatting
+if "TIME" in common_cols_2:
+    time_col_idx = header.index("TIME") + 1
+    for row in ws.iter_rows(min_row=5, min_col=time_col_idx, max_col=time_col_idx):
+        row[0].number_format = "hh:mm:ss"
+
+       
