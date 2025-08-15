@@ -4,33 +4,49 @@ Created on Thu Jul  3 13:25:27 2025
 
 @author: garre
 """
+"""
+Code to copy point-based data from a data sheet used for data input into a ICASA data template.
+All columns that should be transferred need to have the same variable name as in the ICASA templete 
+or a mapping must be provided (mapping_file).
+The data file from where the data is copied needs to have a column 
+that specifies the ODMF number assigned to the point where the sample was taken
+or a mapping from your ids to the ODMF must be provided (id_file).
 
-#Code to copy point-based data from a data sheet used for data input into a ICASA data template.
-#The data file from where the data is copied needs to have a column 
-#that specifies the ODMF number assigned to the point where the sample was taken
-#All columns that should be transferred need to have the same variable name as in the ICASA templete or a mapping must be provided
-#if you run into problems due to datatypes of columns that are empty in one or the other data sheet, try inserting a dummy row with values of the correct type and delete it later
+If you run into problems due to datatypes of columns that are empty in one or the other data sheet, 
+try inserting a dummy row with values of the correct type and delete it later.
+"""
 
-#provide the complete path to the input data sheet (excel format) and sheet name within the workbook
+"""
+Provide the complete path to the input data sheet (excel format) and sheet name within the workbook.
+"""
 input_file = "H:/Data/LI600_2025.xlsx"
 input_sheet = "all"
 
-#provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied
+"""
+Provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied.
+"""
 template_file = "H:/Data/FORMULA_point_data_2.xlsx"
 template_sheet = "PORO_FLUORO"
 
-# specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file
-#if true, provide a mapping table that contains the ICASA varaible names in the first column and your variable names in the second column
-# it can contain more variable names than used in the sheets you want to transform
+"""
+Specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file.
+If true, provide a mapping table that contains the ICASA varaible names in the first column. 
+and your variable names in the second column.
+The file can contain more variable names than used in the sheets you want to transform
+"""
 
 use_mapping =False
 mapping_file = "H:/Data/test_mapping.xlsx"
 mapping_sheet = "variables"
 
-# specify whether you want to provide a custom-id to treatment_number table instead of using the ODMF treatment numbers in your input_file
-#if true, provide a mapping table that contains the treatment_number (ODMF number) in the first column and your ids in the second column
-# it can contain more ids than used in the sheets you want to transform
-# also provide the column name of your custom ID (string)
+"""
+Specify whether you want to provide a custom-id to treatment_number table 
+instead of using the ODMF treatment numbers in your input_file.
+If true, provide a mapping table that contains the treatment_number (ODMF number) in the first column 
+and your ids in the second column.
+The file can contain more ids than used in the sheets you want to transform.
+Also provide the column name of your custom ID (string).
+"""
 
 use_custom_ids = False
 id_file = "H:/Data/test_mapping.xlsx"
@@ -38,7 +54,7 @@ id_sheet = "ids"
 id_name = "id"
 
 
-
+"""
 # specify whether data should be summarized over tecnical replicates (RP) on the same date_of_measurement, 
 # If you choose to summarize:
 #   only columns containing numbers or time can be transferred
@@ -46,22 +62,27 @@ id_name = "id"
 #   standard deviation will be added if the column is included in the template
 # if replicates are present but no summary is intended
 #    a column RP must specify replicate numbers both in the input and the template file
+"""
 
 summarize_samples = True
 
+"""
 #provide unit change information (optional)
 #provide a dictionary of all variables that need a unit change and 
 #the corresponding factors to tranform from the input unit to the output unit 
 #(e.g.plant_height: input centimeter, output meter, provide "PHTD":0.01)
+"""
 
 unit_change = {}
 
 
+"""
 #specify whether you want to overwrite existing values in the template_file with values from the input file
 #this can be used if wrong values have been imported before. 
 #Be aware out that if some (wrong) values are stored in template, they will not be overwritten by importing empty lines.
 # In this case you need to delete the value manually. This is also true for previously calcualted standard deviations.
 #Choose False if no data from the template file should be lost.
+"""
 
 overwrite_values = False
 
@@ -138,6 +159,7 @@ common_cols_2 = input_data_subset.columns.intersection(template_data.columns) #n
 input_data_subset = input_data_subset[common_cols_2]
 
 # unite the template and input data
+
 if "date_of_measurement" and "RP" in common_cols_2:
     keys = ["treatment_number", "date_of_measurement", "RP"]
 elif "RP" in common_cols_2:
