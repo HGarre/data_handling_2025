@@ -6,3 +6,5 @@
 .idea
 *.txt
 *.labimport
+.venv
+ODMF/config.ini
