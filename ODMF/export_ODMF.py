@@ -18,6 +18,8 @@ username = config["odmf"]["username"]
 password = config["odmf"]["password"]
 
 with login(url, username, password) as api:
-    datasets_soil_m = api.dataset.list(valuetype=10)
+    datasets_soil_m = api.dataset.listobj(valuetype=10)
     data_soil_m = api.dataset.values_parquet(dsid=3146)
-    print(data_soil_m.head())
+    print(datasets_soil_m[1]["site"]["id"])
+    one_dataset_obj = api.dataset(dsid=3146)
+    print(one_dataset_obj["site"]["id"])
