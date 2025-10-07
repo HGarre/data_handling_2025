@@ -19,18 +19,18 @@ try inserting a dummy row with values of the correct type and delete it later.
 """
 Provide the complete path to the input data sheet (excel format) and sheet name within the workbook.
 """
-input_file = "H:/Data/LI600_2025.xlsx"
-input_sheet = "all"
+input_file = "H:/Data/Grain_and_Straw_Großmutz_2025.xlsx"
+input_sheet = "Straw"
 
 """
 Provide the complete path to the icasa template (excel format) and sheet name to which the data should be copied.
 """
-template_file = "H:/Data/FORMULA_point_data_2.xlsx"
-template_sheet = "PORO_FLUORO"
+template_file = "H:/Data/FORMULA_point_data_ICASA_2.xlsx"
+template_sheet = "FINAL_GROWTH"
 
 """
 Specify whether you want to provide a mapping table instead of using the ICASA variable names in your input_file.
-If true, provide a mapping table that contains the ICASA varaible names in the first column. 
+If true, provide a mapping table that contains the ICASA varaible names in the first column 
 and your variable names in the second column.
 The file can contain more variable names than used in the sheets you want to transform
 """
@@ -64,7 +64,7 @@ id_name = "id"
 #    a column RP must specify replicate numbers both in the input and the template file
 """
 
-summarize_samples = True
+summarize_samples = False
 
 """
 #provide unit change information (optional)
@@ -79,7 +79,7 @@ unit_change = {}
 """
 #specify whether you want to overwrite existing values in the template_file with values from the input file
 #this can be used if wrong values have been imported before. 
-#Be aware out that if some (wrong) values are stored in template, they will not be overwritten by importing empty lines.
+#Be aware that if some (wrong) values are stored in template, they will not be overwritten by importing empty lines.
 # In this case you need to delete the value manually. This is also true for previously calcualted standard deviations.
 #Choose False if no data from the template file should be lost.
 """
@@ -92,7 +92,7 @@ import pandas as pd
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
-# imporating the data, excudong the top rows from the template
+# imporating the data, excluding the top rows from the template
 
 input_data = pd.read_excel(input_file, sheet_name = input_sheet)
 
