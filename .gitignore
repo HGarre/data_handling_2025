@@ -1,0 +1,8 @@
+# Ignore Excel files
+*.xlsx
+*.zip
+# Ignore temporary files
+*.tmp
+.idea
+*.txt
+*.labimport
