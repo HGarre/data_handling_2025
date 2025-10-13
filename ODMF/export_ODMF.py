@@ -11,6 +11,7 @@ Revised: Added config file for credentials
 import configparser
 from odmfclient import login
 import pandas as pd
+import numpy as np
 
 config_path = "config.ini"
 config = configparser.ConfigParser()
@@ -59,9 +60,46 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
         data_total = pd.concat([data_total, data], ignore_index = True)
     return data_total
 
+def agg_data_daily(df, function_name):
+    """
+    Aggregates data exported from ODMF e.g. by data_by_valuetype per day using the given aggregation function.
+
+    Parameters
+    ----------
+    df : Data.Frame
+        A dataframe containing values sorted by site, level and time.
+    function_name : string
+        A aggregation function auch as mean, sum, min, max.
+
+    Returns
+    -------
+    data_summed : TYPE
+        DESCRIPTION.
+
+    """
+    data_summed = (
+    df
+    .groupby(
+        [
+            pd.Grouper(key='time', freq='D'),   # daily bucket, anchored at midnight UTC
+            'site',
+            'level'
+        ]
+    )['value']                                
+    .agg(function_name)                                    
+    .reset_index()                             
+    .rename(columns={'time': 'date', 'value': 'value_mean'})
+    )
+    return data_summed
+
+#def extraxt_ICASA_info (valuetype_id):
+    
+#    return ICASA_dict
+
 
 with login(url, username, password) as api:
     data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
+    data_soil_moisture_mean = agg_data_daily(data_soil_moisture, "mean")
     #datasets= api.dataset.list(valuetype=10, project=7)
     #data_example = api.dataset.values_parquet(dsid=3098, start="2025-10-10", end="2025-10-13")
     #data_obj_example = api.dataset(dsid=3098)
