@@ -62,7 +62,7 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
 
 def agg_data_daily(df, function_name):
     """
-    Aggregates data exported from ODMF e.g. by data_by_valuetype per day using the given aggregation function.
+    Aggregates data exported from ODMF e.g. by data_by_valuetype per day using the given aggregation functiongit .
 
     Parameters
     ----------
