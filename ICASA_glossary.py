@@ -6,9 +6,7 @@ Created on Mon Oct 20 12:05:35 2025
 """
 
 import pandas as pd
-#from pathlib import Path
-#import argparse
-#import sys
+import os
 
 
 def extract_two_rows(df: pd.DataFrame) -> pd.DataFrame:
@@ -61,10 +59,10 @@ def build_glossary_dataframe(
 
     return glossary_df
 
-'''
+
 def write_glossary_to_new_file(
     glossary_df: pd.DataFrame,
-    dest_path: Path,
+    dest_path: str,
     sheet_name: str = "glossary"
 ) -> None:
     """
@@ -75,7 +73,18 @@ def write_glossary_to_new_file(
     with pd.ExcelWriter(dest_path, engine="openpyxl", mode="w") as writer:
         glossary_df.to_excel(writer, sheet_name=sheet_name, index=False)
     print(f"[DONE] Glossary saved to '{dest_path}' (sheet name: '{sheet_name}').")
-'''
+
 
 if __name__ == "__main__":
-    glossary = build_glossary_dataframe("C:/Users/garre/Data/ICASA_for_agroforstry_draft_4.xlsx", (2,3))
+    
+    #provide the name of an input file that is located in the same folder as the script
+    input_file = "ICASA_for_agroforstry_draft_4.xlsx"
+    #provide a name of the output file
+    output_file = "glossary"
+    
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
+    input_path = os.path.join(BASE_DIR, input_file)
+    output_path = os.path.join(BASE_DIR, output_file)
+    
+    glossary = build_glossary_dataframe(input_path, (2,3))
+    write_glossary_to_new_file(glossary, output_path)
