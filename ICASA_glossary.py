@@ -41,18 +41,16 @@ def build_glossary_dataframe(
             sheet_name=None,
             header=None,
             dtype=str,
-            engine="openpyxl",
+            engine="openpyxl"
         )
 
     all_blocks = []                         
 
-    for sheet_name, raw_df in sheet_dict.items():
-        # We only need the first four rows; the rest are ignored.
-        # By slicing ``raw_df`` we avoid loading a huge sheet into memory
-        # when the workbook is massive.
-        raw_df = raw_df.iloc[:max(row_indices)+1]   # safe cut‑off
+    for sheet_name, raw_df in sheet_dict.items(): #looping through the dictionary and keeping both the keys (assigned to sheet_name) and the values (in this case dataframes assigned to raw_df)
+        
+        sliced_df = raw_df.iloc[:max(row_indices)+1]   # safe cut‑off to spare memory
 
-        block = extract_two_rows(raw_df)
+        block = extract_two_rows(sliced_df)
         
         block["Sheet"] = sheet_name          
         # Keep the column order that the final CSV expects
@@ -80,4 +78,4 @@ def write_glossary_to_new_file(
 '''
 
 if __name__ == "__main__":
-    glossary = build_glossary_dataframe("ICASA_for_agroforestry_draft_4.xlsx", (2,3))
+    glossary = build_glossary_dataframe("C:/Users/garre/Data/ICASA_for_agroforstry_draft_4.xlsx", (2,3))
