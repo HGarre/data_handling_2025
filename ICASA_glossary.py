@@ -115,8 +115,9 @@ def enrich_glossary_with_metadata(
     )
    
     ref_cols = ref_glossary [[var_col, col1, col2]]
+    ref_cols_unique = (ref_cols.groupby(var_col, as_index=False).agg({col1: "first", col2: "first"})) #make a unique "dictionary" to avoid dublications
         
-    enriched = pd.merge(glossary_df, ref_cols, how="left", on = var_col)
+    enriched = pd.merge(glossary_df, ref_cols_unique, how="left", on = var_col)
 
     return enriched
 
@@ -134,5 +135,5 @@ if __name__ == "__main__":
     
     glossary = build_glossary_dataframe(input_path, (2,3))
     enriched = enrich_glossary_with_metadata(glossary, input_file)
-    write_glossary_to_new_file(glossary, output_path)
+    write_glossary_to_new_file(enriched, output_path)
     
