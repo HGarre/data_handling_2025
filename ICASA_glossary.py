@@ -18,7 +18,7 @@ def extract_two_rows(df: pd.DataFrame) -> pd.DataFrame:
     rows = df.iloc[[2, 3]]
 
     transposed = rows.T.reset_index(drop=True)
-    transposed.columns = ["Unit_or_type", "Variable_name"]          
+    transposed.columns = ["Unit_or_type", "Variable_Name"]          
     return transposed
 
 
@@ -52,7 +52,7 @@ def build_glossary_dataframe(
         
         block["Sheet"] = sheet_name          
         # Keep the column order that the final CSV expects
-        block = block[["Sheet", "Variable_name", "Unit_or_type",]]
+        block = block[["Sheet", "Variable_Name", "Unit_or_type",]]
         all_blocks.append(block)
 
     glossary_df = pd.concat(all_blocks, axis=0, ignore_index=True)
@@ -76,90 +76,47 @@ def write_glossary_to_new_file(
     
 def enrich_glossary_with_metadata(
     glossary_df: pd.DataFrame,
-    src_workbook: Path,
+    src_path: str,
     glossary_sheet_name: str = "Glossary",
-    var_col: str = "Variable_name",
-    code_col: str = "Code_Query",
-    desc_col: str = "Description",
+    var_col: str = "Variable_Name",
+    col1: str = "Code_Query",
+    col2: str = "Description",
 ) -> pd.DataFrame:
     """
-    Append two rows (Code_Query & Description) for every variable that appears in
-    ``glossary_df['Row4']`` by looking them up in the *Glossary* sheet of the
+    Append two rows (e.g. Code_Query & Description) for every variable by looking them up in the *Glossary* sheet of the
     original workbook.
 
     Parameters
     ----------
     glossary_df : pd.DataFrame
         The dataframe that already contains the three columns
-        ``['Row3', 'Row4', 'Sheet']`` created by ``build_glossary_dataframe``.
-    src_workbook : pathlib.Path
+        ``["Sheet", "Variable_name", "Unit_or_type"]`` created by ``build_glossary_dataframe``.
+    src_path : str
         Path to the original workbook that holds the reference “Glossary” sheet.
     glossary_sheet_name : str, default "Glossary"
         Name of the sheet that stores the master list of variables.
     var_col : str, default "Variable_name"
         Column in the reference sheet that holds the variable identifiers.
-    code_col : str, default "Code_Query"
-        Column that holds the *code query* we want to pull.
-    desc_col : str, default "Description"
-        Column that holds the description we want to pull.
+    col1 : str, default "Code_Query"
+        Column of glossary_sheet_name that holds values to append to glossary_df.
+    col2 : str, default "Description"
+        Column of glossary_sheet_name that holds values to append to glossary_df.
 
     Returns
     -------
     pd.DataFrame
-        ``glossary_df`` with two additional rows for each variable (code query &
-        description).  If a variable cannot be found, the added rows contain
+        ``glossary_df`` with two additional rows for each variable.  If a variable cannot be found, the added rows contain
         empty strings.
     """
-    # ------------------------------------------------------------------
-    # 1️⃣  Load the reference sheet (all values as strings – keep blanks).
-    # ------------------------------------------------------------------
-    ref_df = pd.read_excel(
-        src_workbook,
+    ref_glossary = pd.read_excel(
+        src_path,
         sheet_name=glossary_sheet_name,
-        dtype=str,          # forces NaN → None/np.nan later, we will replace
+        dtype=str, skiprows=3        
     )
-
-    # Normalise column names – strip spaces and enforce exact spelling
-    ref_df = ref_df.rename(columns=lambda x: x.strip())
-
-    # Make a quick lookup dictionary: variable → (code, description)
-    # We use a case‑insensitive key to be forgiving.
-    lookup = {}
-    for _, row in ref_df.iterrows():
-        var = str(row.get(var_col, "")).strip()
-        if not var:
-            continue
-        lookup[var.lower()] = (
-            str(row.get(code_col, "")).strip(),
-            str(row.get(desc_col, "")).strip(),
-        )
-
-    # ------------------------------------------------------------------
-    # 2️⃣  Walk through every variable that appears in the *second* column
-    #     of the glossary we already built (i.e. ``Row4``).
-    # ------------------------------------------------------------------
-    rows_to_append = []
-    for var in glossary_df["Row4"].dropna().unique():
-        key = str(var).strip().lower()
-        code, desc = lookup.get(key, ("", ""))   # default → empty strings
-
-        # First extra row → Code_Query
-        rows_to_append.append(
-            {"Row3": var, "Row4": code, "Sheet": ""}   # keep order identical to original df
-        )
-        # Second extra row → Description
-        rows_to_append.append(
-            {"Row3": var, "Row4": desc, "Sheet": ""}
-        )
-
-    # ------------------------------------------------------------------
-    # 3️⃣  Concatenate the new rows to the original dataframe.
-    # ------------------------------------------------------------------
-    if rows_to_append:
-        extra_df = pd.DataFrame(rows_to_append, columns=glossary_df.columns)
-        enriched = pd.concat([glossary_df, extra_df], ignore_index=True)
-    else:
-        enriched = glossary_df.copy()
+   
+    ref_cols = ref_glossary [[var_col, col1, col2]]
+        
+    enriched = pd.merge(glossary_df, ref_cols, how="left", on = var_col)
 
     return enriched
 
@@ -169,11 +126,13 @@ if __name__ == "__main__":
     #provide the name of an input file that is located in the same folder as the script
     input_file = "ICASA_for_agroforstry_draft_4.xlsx"
     #provide a name of the output file
-    output_file = "glossary"
+    output_file = "glossary.xlsx"
     
     BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
     input_path = os.path.join(BASE_DIR, input_file)
     output_path = os.path.join(BASE_DIR, output_file)
     
     glossary = build_glossary_dataframe(input_path, (2,3))
+    enriched = enrich_glossary_with_metadata(glossary, input_file)
     write_glossary_to_new_file(glossary, output_path)
+    
