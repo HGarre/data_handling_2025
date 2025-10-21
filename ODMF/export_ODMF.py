@@ -11,6 +11,7 @@ Revised: Added config file for credentials
 import configparser
 from odmfclient import login
 import pandas as pd
+import re
 
 
 config_path = "config.ini"
@@ -88,23 +89,45 @@ def agg_data_daily(df, function_name):
     )['value']                                
     .agg(function_name)                                    
     .reset_index()                             
-    .rename(columns={'time': 'date', 'value': 'value_mean'})
+    .rename(columns={'time': 'date', 'value': 'value_agg'})
     )
     return data_summed
 
-#def extraxt_ICASA_info (valuetype_id):
-#   datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
-#   fist_dataset = datasets[1]
-#   first_dataset_obj = api.dataset.listobj(dsid=first_dataset)
-#   valuetype_info =first_dataset_obj["valuetype"]["comment"]
-#   some regex
-#   return ICASA_dict
+def extraxt_ICASA_info (valuetype_id, project_id):
+   datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
+   first_dataset = datasets[1]
+   first_dataset_obj = api.dataset(dsid=first_dataset)
+   valuetype_info =first_dataset_obj["valuetype"]["comment"]
+   
+   pattern = re.compile(
+    r'''
+    ICASA:\s*
+    (?P<Variable_name>[^*\n,]+)          # Variable_name (mandatory)
+    (?:\*(?P<conversion>\d+(?:\.\d+)?))?   # *conversion (optional but required if * present)
+    (?:,\s*(?P<aggregation>\S+))?          # ,aggregation (optional but required if , present)
+    \s*$                        # line end
+    ''',
+    re.VERBOSE | re.MULTILINE
+    )
+   
+   extraction=pattern.search(valuetype_info)
+   ICASA_dict=extraction.groupdict()
+   
+   factor = ICASA_dict.get("conversion")
+   ICASA_dict["conversion"]=float(factor) if factor else None
+   
+   return ICASA_dict
 
 
 with login(url, username, password) as api:
-    #data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
-    #data_soil_moisture_mean = agg_data_daily(data_soil_moisture, "mean")
-    datasets_example = api.dataset.list(valuetype=10, project=7)
+    data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
+    ICASA_soil_moisture = extraxt_ICASA_info(10, 7)
+    agg = ICASA_soil_moisture.get("aggregation")
+    data_soil_moisture_agg = agg_data_daily(data_soil_moisture, agg)
+    
+    
+    #datasets_example = api.dataset.list(valuetype=10, project=7)
     #data_example = api.dataset.values_parquet(dsid=3098, start="2025-10-10", end="2025-10-13")
     #data_obj_example = api.dataset(dsid=3098)
     #valuetype_obj_example = api.dataset.listobj(valuetype=10) #reveals many dataset objects, not the valuetype object
+    
