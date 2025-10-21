@@ -3,6 +3,14 @@
 Created on Mon Oct 20 12:05:35 2025
 
 @author: garre
+
+The Script produces a glossary from an excel sheet containing many ICASA data sheets (according to the template issued August 2025), 
+listing the two rows for "Variable_Name" and "Unit_or_type", by default rows 3 and 4 of each sheet by sheet-names.
+An seperate excel file can be produced, from where the glossary can be copiedcorresponding ICASA data sheet.
+Rows of the resulting glossary that originate from sheets not containing data (e.g. ReadMe) need to be deleted later by hand.
+The glossary can be "enriched" with two more rows of Variable information (e.g. Code_Query and Description) 
+from a previous glossary or the ICASA Dictionary.
+
 """
 
 import pandas as pd
@@ -83,8 +91,8 @@ def enrich_glossary_with_metadata(
     col2: str = "Description",
 ) -> pd.DataFrame:
     """
-    Append two rows (e.g. Code_Query & Description) for every variable by looking them up in the *Glossary* sheet of the
-    original workbook.
+    Append two rows (e.g. Code_Query & Description) for every variable by looking them up in a sheet of the
+    original workbook (e.g. old glossary) or a dictionary. The first occurance of the variable in the old sheet is used.
 
     Parameters
     ----------
