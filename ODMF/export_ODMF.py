@@ -94,12 +94,30 @@ def agg_data_daily(df, function_name):
     return data_summed
 
 def extraxt_ICASA_info (valuetype_id, project_id):
-   datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
-   first_dataset = datasets[1]
-   first_dataset_obj = api.dataset(dsid=first_dataset)
-   valuetype_info =first_dataset_obj["valuetype"]["comment"]
+    '''
+    Extracts information about the ICASA variable corresponding to the given value_type.
+    For now only the first ICASA variable_name is extracted.
+
+    Parameters
+    ----------
+    valuetype_id : int
+        ID given in the ODMF system to the valuetype for which the information should be extracted.
+    project_id : int
+        ID of a project in ODMF that uses the valuetype to ensure access to the information via datasets.
+
+    Returns
+    -------
+    ICASA_dict : dictionary
+        dictionary containing the ICASA variable name, the unit conversion factor 
+        and the agrregation function for transform from the value_type to the ICASA variable_name.
+        
+    '''
+    datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
+    first_dataset = datasets[1]
+    first_dataset_obj = api.dataset(dsid=first_dataset)
+    valuetype_info =first_dataset_obj["valuetype"]["comment"]
    
-   pattern = re.compile(
+    pattern = re.compile(
     r'''
     ICASA:\s*
     (?P<Variable_name>[^*\n,]+)          # Variable_name (mandatory)
@@ -110,13 +128,13 @@ def extraxt_ICASA_info (valuetype_id, project_id):
     re.VERBOSE | re.MULTILINE
     )
    
-   extraction=pattern.search(valuetype_info)
-   ICASA_dict=extraction.groupdict()
+    extraction=pattern.search(valuetype_info)
+    ICASA_dict=extraction.groupdict()
    
-   factor = ICASA_dict.get("conversion")
-   ICASA_dict["conversion"]=float(factor) if factor else None
+    factor = ICASA_dict.get("conversion")
+    ICASA_dict["conversion"]=float(factor) if factor else None
    
-   return ICASA_dict
+    return ICASA_dict
 
 
 with login(url, username, password) as api:
