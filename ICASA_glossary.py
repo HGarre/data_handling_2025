@@ -14,9 +14,17 @@ from a previous glossary or the ICASA Dictionary.
 """
 
 import pandas as pd
+from openpyxl import load_workbook
 import os
 
 
+def print_sheet_names (src_path: str) -> None:
+    wb = load_workbook(src_path, read_only=True, data_only=True)
+    ordered_sheets = wb.sheetnames
+    for name in ordered_sheets:
+        print(name)
+    wb.close()
+    
 def extract_two_rows(df: pd.DataFrame) -> pd.DataFrame:
     """
     Helper: keep only rows 3 and 4 (index 2 & 3) and drop columns that are empty
@@ -49,7 +57,7 @@ def build_glossary_dataframe(
             dtype=str,
             engine="openpyxl"
         )
-
+    
     all_blocks = []                         
 
     for sheet_name, raw_df in sheet_dict.items(): #looping through the dictionary and keeping both the keys (assigned to sheet_name) and the values (in this case dataframes assigned to raw_df)
@@ -134,6 +142,7 @@ if __name__ == "__main__":
     
     #provide the name of an input file that is located in the same folder as the script
     input_file = "ICASA_for_agroforstry_draft_4.xlsx"
+    variables_all = "variable_sorting.xlsx"
     #provide a name of the output file
     output_file = "glossary.xlsx"
     
@@ -141,6 +150,7 @@ if __name__ == "__main__":
     input_path = os.path.join(BASE_DIR, input_file)
     output_path = os.path.join(BASE_DIR, output_file)
     
+    print_sheet_names(input_path)
     glossary = build_glossary_dataframe(input_path, (2,3))
     enriched = enrich_glossary_with_metadata(glossary, input_file)
     write_glossary_to_new_file(enriched, output_path)
