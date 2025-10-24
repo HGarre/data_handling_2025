@@ -97,6 +97,7 @@ def enrich_glossary_with_metadata(
     var_col: str = "Variable_Name",
     col1: str = "Code_Query",
     col2: str = "Description",
+    header_row: int = 4
 ) -> pd.DataFrame:
     """
     Append two rows (e.g. Code_Query & Description) for every variable by looking them up in a sheet of the
@@ -117,7 +118,8 @@ def enrich_glossary_with_metadata(
         Column of glossary_sheet_name that holds values to append to glossary_df.
     col2 : str, default "Description"
         Column of glossary_sheet_name that holds values to append to glossary_df.
-
+    header_row: str, default "4"
+        Row in which the data starts with column names.
     Returns
     -------
     pd.DataFrame
@@ -127,8 +129,10 @@ def enrich_glossary_with_metadata(
     ref_glossary = pd.read_excel(
         src_path,
         sheet_name=glossary_sheet_name,
-        dtype=str, skiprows=3        
+        dtype=str, skiprows=header_row-1        
     )
+    
+    print(ref_glossary.info())
    
     ref_cols = ref_glossary [[var_col, col1, col2]]
     ref_cols_unique = (ref_cols.groupby(var_col, as_index=False).agg({col1: "first", col2: "first"})) #make a unique "dictionary" to avoid dublications
@@ -144,14 +148,17 @@ if __name__ == "__main__":
     input_file = "ICASA_for_agroforstry_draft_4.xlsx"
     variables_all = "variable_sorting.xlsx"
     #provide a name of the output file
-    output_file = "glossary.xlsx"
+    output_file = "glossary_with_dict.xlsx"
     
     BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
     input_path = os.path.join(BASE_DIR, input_file)
     output_path = os.path.join(BASE_DIR, output_file)
+    dict_path = os.path.join(BASE_DIR, variables_all)
     
     print_sheet_names(input_path)
     glossary = build_glossary_dataframe(input_path, (2,3))
     enriched = enrich_glossary_with_metadata(glossary, input_file)
-    write_glossary_to_new_file(enriched, output_path)
+    enriched_with_dict = enrich_glossary_with_metadata(glossary_df=glossary, src_path=dict_path, glossary_sheet_name="Tabelle1", header_row=1)
+    enriched = enriched[["Sheet","Variable_Name", "Code_Query", "Description", "Unit_or_type",]]
+    write_glossary_to_new_file(enriched_with_dict, output_path)
     
