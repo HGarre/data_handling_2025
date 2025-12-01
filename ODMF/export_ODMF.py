@@ -93,15 +93,17 @@ def agg_data_daily(df, function_name):
     )
     return data_summed
 
-def extraxt_ICASA_info (valuetype_id, project_id):
+def extract_ICASA_info (api, valuetype_id, project_id):
     '''
     Extracts information about the ICASA variable corresponding to the given value_type.
     For now only the first ICASA variable_name is extracted.
 
     Parameters
     ----------
+    api : ?
+        Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
     valuetype_id : int
-        ID given in the ODMF system to the valuetype for which the information should be extracted.
+        ID given in the ODMF system to tcdhe valuetype for which the information should be extracted.
     project_id : int
         ID of a project in ODMF that uses the valuetype to ensure access to the information via datasets.
 
@@ -136,13 +138,48 @@ def extraxt_ICASA_info (valuetype_id, project_id):
    
     return ICASA_dict
 
-
-with login(url, username, password) as api:
-    data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
-    ICASA_soil_moisture = extraxt_ICASA_info(10, 7)
-    agg = ICASA_soil_moisture.get("aggregation")
-    data_soil_moisture_agg = agg_data_daily(data_soil_moisture, agg)
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_name, level_col=False):
+    '''
     
+
+    Parameters
+    ----------
+    api : ?
+        Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
+    valuetype_id : Integer
+        ID given in the ODMF system to the valuetype for which data should be exported.
+    project_id : Integer
+        ID given in the ODMF system to the project from which data should be exported.
+        DESCRIPTION.
+    start_date : String
+        First date for which data should be exported in format yyyy-mm-dd.
+    end_date : String
+        Last date for which data should be exported in format yyyy-mm-dd.
+    file_name: string
+        Name of the ICASA template file into which the data should be pasted.
+    level_col: string, optional
+        Optional. If applicable, name of the column in the ICASA sheet corresponsing to the ODMF levels (e.g. soil layers).
+
+    Returns
+    -------
+    None.
+
+    '''
+    ICASA_info = extract_ICASA_info(api, valuetype_id, project_id)
+    ICASA_name = ICASA_info["Variable_name"]
+    #search for ICASA name within the file, if not found retrun error
+    #if found, check whether there is the given level column, if not return error
+    #fetch the data
+    #check whether the data contains layers, if not match what is provided to funtion raise error
+        #check whether helper functions work for data without levels, make more felxible if needed
+    return ICASA_name
+    
+with login(url, username, password) as api:
+    #data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
+    #ICASA_soil_moisture = extract_ICASA_info(api, 10, 7)
+    #agg = ICASA_soil_moisture.get("aggregation")
+   # data_soil_moisture_agg = agg_data_daily(data_soil_moisture, agg)
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12", "test-file")
     
     #datasets_example = api.dataset.list(valuetype=10, project=7)
     #data_example = api.dataset.values_parquet(dsid=3098, start="2025-10-10", end="2025-10-13")
