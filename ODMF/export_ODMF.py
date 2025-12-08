@@ -8,11 +8,13 @@ Revised: Added config file for credentials
 
 # FORMULA project id: 7
 
+import os
 import configparser
 from odmfclient import login
 import pandas as pd
 import re
-
+from openpyxl import load_workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
 
 config_path = "config.ini"
 config = configparser.ConfigParser()
@@ -33,13 +35,13 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
     ----------
     api : ?
         Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
-    valuetype_id : Integer
+    valuetype_id : integer
         ID given in the ODMF system to the valuetype for which data should be exported.
-    project_id : Integer
+    project_id : integer
         ID given in the ODMF system to the project from which data should be exported.
-    start_date : String
+    start_date : string
         First date for which data should be exported in format yyyy-mm-dd.
-    end_date : String
+    end_date : string
         Last date for which data should be exported in format yyyy-mm-dd.
 
     Returns
@@ -102,9 +104,9 @@ def extract_ICASA_info (api, valuetype_id, project_id):
     ----------
     api : ?
         Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
-    valuetype_id : int
+    valuetype_id : integer
         ID given in the ODMF system to tcdhe valuetype for which the information should be extracted.
-    project_id : int
+    project_id : integer
         ID of a project in ODMF that uses the valuetype to ensure access to the information via datasets.
 
     Returns
@@ -138,7 +140,37 @@ def extract_ICASA_info (api, valuetype_id, project_id):
    
     return ICASA_dict
 
-def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_name, level_col=False):
+def find_ICASA_sheet_by_variable_name (variable_name, file_path):
+    '''
+    
+
+    Parameters
+    ----------
+    variable_name : string
+        Name of the ICASA variable to localize.
+    file_path : string
+        Path to the ICASA template to search in.
+
+    Returns
+    -------
+    sheet_name: str
+
+    '''
+    wb = load_workbook(file_path, data_only=True)
+
+    for sheet in wb.sheetnames:
+        ws = wb[sheet]
+        row4_values = [cell.value for cell in ws[4]]
+        if any(str(value) == str(variable_name) for value in row4_values if value is not None):
+            sheet_name = sheet
+    
+    if "sheet_name" not in locals():
+        raise ValueError("Variable name is not found in the provided ICASA template")
+    
+    return sheet_name
+            
+
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col=False):
     '''
     
 
@@ -146,12 +178,12 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     ----------
     api : ?
         Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
-    valuetype_id : Integer
+    valuetype_id : integer
         ID given in the ODMF system to the valuetype for which data should be exported.
-    project_id : Integer
+    project_id : integer
         ID given in the ODMF system to the project from which data should be exported.
         DESCRIPTION.
-    start_date : String
+    start_date : string
         First date for which data should be exported in format yyyy-mm-dd.
     end_date : String
         Last date for which data should be exported in format yyyy-mm-dd.
@@ -165,21 +197,41 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     None.
 
     '''
-    ICASA_info = extract_ICASA_info(api, valuetype_id, project_id)
+    try: 
+        ICASA_info = extract_ICASA_info(api, valuetype_id, project_id)
+    except:
+        raise ValueError("No ICASA info or datasets can be found for the given valuetype. Check whether (1) The given valuetype has an ICASA comment in ODMF, (2) datasets are present for the given valuetype and you have access to them via the project and api provided, and (3) you are connected to a network that gives you access to ODMF.")
+        
     ICASA_name = ICASA_info["Variable_name"]
+    ICASA_conversion = ICASA_info["conversion"]
+    ICASA_aggregation = ICASA_info["aggregation"]
+    
+    
     #search for ICASA name within the file, if not found retrun error
     #if found, check whether there is the given level column, if not return error
     #fetch the data
     #check whether the data contains layers, if not match what is provided to funtion raise error
         #check whether helper functions work for data without levels, make more felxible if needed
-    return ICASA_name
+    #evtl include level information in the ICASA info from ODMF instead the function
+    return ICASA_name, ICASA_conversion, ICASA_aggregation
     
-with login(url, username, password) as api:
+
+input_file = "ICASA_for_agroforstry_draft_final.xlsx"
+output_file = "glossary_with_old_gloss.xlsx"
+BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
+input_path = os.path.join(BASE_DIR, input_file)
+print(input_path)
+output_path = os.path.join(BASE_DIR, output_file)
+
+Sheet_name_test = find_ICASA_sheet_by_variable_name("soil_water_by_layer", input_path)
+
+#with login(url, username, password) as api:
+    
     #data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
     #ICASA_soil_moisture = extract_ICASA_info(api, 10, 7)
     #agg = ICASA_soil_moisture.get("aggregation")
-   # data_soil_moisture_agg = agg_data_daily(data_soil_moisture, agg)
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12", "test-file")
+    #data_soil_moisture_agg = agg_data_daily(data_soil_moisture, agg)
+    #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=2, project_id=None, start_date="2025-10-10", end_date="2025-10-12", file_path="test-file")
     
     #datasets_example = api.dataset.list(valuetype=10, project=7)
     #data_example = api.dataset.values_parquet(dsid=3098, start="2025-10-10", end="2025-10-13")
