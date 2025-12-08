@@ -80,18 +80,20 @@ def agg_data_daily(df, function_name):
         DESCRIPTION.
 
     """
+    df["level"] = df["level"].fillna("None") #makes None a string to make grouping possible if there are no levels in the data
+    
     data_summed = (
     df
     .groupby(
         [
-            pd.Grouper(key='time', freq='D'),   # daily bucket, anchored at midnight UTC
+            pd.Grouper(key='time', freq='D'),
             'site',
             'level'
         ]
     )['value']                                
     .agg(function_name)                                    
     .reset_index()                             
-    .rename(columns={'time': 'date', 'value': 'value_agg'})
+    .rename(columns={'time': 'date'})
     )
     return data_summed
 
@@ -170,7 +172,7 @@ def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     return sheet_name
             
 
-def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col=False):
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None):
     '''
     
 
@@ -187,11 +189,10 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         First date for which data should be exported in format yyyy-mm-dd.
     end_date : String
         Last date for which data should be exported in format yyyy-mm-dd.
-    file_name: string
-        Name of the ICASA template file into which the data should be pasted.
+    file_path: string
+        Path to the ICASA template file into which the data should be pasted.
     level_col: string, optional
-        Optional. If applicable, name of the column in the ICASA sheet corresponsing to the ODMF levels (e.g. soil layers).
-
+        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
     Returns
     -------
     None.
@@ -206,13 +207,26 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     ICASA_conversion = ICASA_info["conversion"]
     ICASA_aggregation = ICASA_info["aggregation"]
     
+    data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
     
-    #search for ICASA name within the file, if not found retrun error
-    #if found, check whether there is the given level column, if not return error
-    #fetch the data
-    #check whether the data contains layers, if not match what is provided to funtion raise error
-        #check whether helper functions work for data without levels, make more felxible if needed
-    #evtl include level information in the ICASA info from ODMF instead the function
+    if ICASA_conversion != None:
+        data["value"] = data["value"]/ICASA_conversion
+    
+    if ICASA_aggregation != None:
+        data = agg_data_daily(data, ICASA_aggregation)
+    
+    if level_col == None:
+        data.drop("level", axis=1, inplace="True")
+    else: 
+        data.rename(columns={"level": level_col})
+        
+    data.rename(columns={"date": "date_of_measurement", "site": "sampling_location_number", "value": ICASA_name})
+        
+    ICASA_sheet = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+    
+    
+        
+    
     return ICASA_name, ICASA_conversion, ICASA_aggregation
     
 
@@ -225,12 +239,12 @@ output_path = os.path.join(BASE_DIR, output_file)
 
 Sheet_name_test = find_ICASA_sheet_by_variable_name("soil_water_by_layer", input_path)
 
-#with login(url, username, password) as api:
+with login(url, username, password) as api:
     
-    #data_soil_moisture = data_by_valuetype(api, 10, 7, "2025-10-10", "2025-10-12")
+    data_LAI = data_by_valuetype(api, 34, 7, "2025-04-04", "2025-07-01")
     #ICASA_soil_moisture = extract_ICASA_info(api, 10, 7)
-    #agg = ICASA_soil_moisture.get("aggregation")
-    #data_soil_moisture_agg = agg_data_daily(data_soil_moisture, agg)
+   #agg = ICASA_soil_moisture.get("aggregation")
+    data_LAI_agg = agg_data_daily(data_LAI, "mean")
     #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=2, project_id=None, start_date="2025-10-10", end_date="2025-10-12", file_path="test-file")
     
     #datasets_example = api.dataset.list(valuetype=10, project=7)
