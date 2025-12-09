@@ -171,8 +171,38 @@ def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     
     return sheet_name
             
+def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrite=False):
+    '''
 
-def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None):
+    Parameters
+    ----------
+    new_data : dataframe
+        Containing the data to add to the template.
+    template_data : dataframe
+        Containing the sheet of the template to which the new data should be added.
+    level_col: string, optional
+        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
+    overwrite : boolean, optional
+        Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
+
+    Returns
+    -------
+    None.
+
+    '''
+    common_cols = new_data.columns.intersection(template_data.columns)
+    new_data_subset = new_data.loc[:,common_cols]
+    
+    if "date_of_measurement" and "time_of_measurement" and level_col in common_cols:
+        keys=["date_of_measurement", "time_of_measurement", level_col]
+    elif "date_of_measurement" and level_col in common_cols:
+        keys=["date_of_measurement", level_col]
+    elif "date_of_measurement" and "time_of_measurement" in common_cols:
+        keys=["date_of_measurement", "time_of_measurement"]
+    else:
+        keys=["date_of_measurement"]
+
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None, overwrite =False):
     '''
     
 
@@ -193,6 +223,8 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         Path to the ICASA template file into which the data should be pasted.
     level_col: string, optional
         Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
+    overwrite: boolean, optional
+        Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
     Returns
     -------
     None.
@@ -209,43 +241,51 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     
     data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
     
+    if data.empty:
+        raise ValueError("No datasets could be exported. Check whether (1) Datasets are present for the given valuetype and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
+    
     if ICASA_conversion != None:
-        data["value"] = data["value"]/ICASA_conversion
+       data["value"] = data["value"]/ICASA_conversion
     
     if ICASA_aggregation != None:
         data = agg_data_daily(data, ICASA_aggregation)
+    else:
+        data = data.rename(columns={"time": "date_of_measurement"})
     
     if level_col == None:
-        data.drop("level", axis=1, inplace="True")
+        data.drop("level", axis=1, inplace=True)
     else: 
-        data.rename(columns={"level": level_col})
+       data = data.rename(columns={"level": level_col})
         
-    data.rename(columns={"date": "date_of_measurement", "site": "sampling_location_number", "value": ICASA_name})
+    data = data.rename(columns={"date": "date_of_measurement", "site": "sampling_location_number", "value": ICASA_name})
         
-    ICASA_sheet = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+    ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+    
+    template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
     
     
+    
+    #adapt from data_transform (evetually built more helper functions)
         
     
-    return ICASA_name, ICASA_conversion, ICASA_aggregation
+    return data
     
 
 input_file = "ICASA_for_agroforstry_draft_final.xlsx"
-output_file = "glossary_with_old_gloss.xlsx"
+output_file = ""
 BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
 input_path = os.path.join(BASE_DIR, input_file)
-print(input_path)
 output_path = os.path.join(BASE_DIR, output_file)
 
-Sheet_name_test = find_ICASA_sheet_by_variable_name("soil_water_by_layer", input_path)
+#Sheet_name_test = find_ICASA_sheet_by_variable_name("soil_water_by_layer", input_path)
 
 with login(url, username, password) as api:
     
-    data_LAI = data_by_valuetype(api, 34, 7, "2025-04-04", "2025-07-01")
+    #data_LAI = data_by_valuetype(api, 34, 7, "2025-04-04", "2025-07-01")
     #ICASA_soil_moisture = extract_ICASA_info(api, 10, 7)
-   #agg = ICASA_soil_moisture.get("aggregation")
-    data_LAI_agg = agg_data_daily(data_LAI, "mean")
-    #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=2, project_id=None, start_date="2025-10-10", end_date="2025-10-12", file_path="test-file")
+    #agg = ICASA_soil_moisture.get("aggregation")
+    #data_LAI_agg = agg_data_daily(data_LAI, "mean")
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-15", end_date="2025-10_20", file_path=input_file, level_col = "me_soil_layer_top_depth")
     
     #datasets_example = api.dataset.list(valuetype=10, project=7)
     #data_example = api.dataset.values_parquet(dsid=3098, start="2025-10-10", end="2025-10-13")
