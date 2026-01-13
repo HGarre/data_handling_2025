@@ -76,7 +76,7 @@ def agg_data_daily(df, function_name):
 
     Returns
     -------
-    data_summed : TYPE
+    data_summed : data_frame
         DESCRIPTION.
 
     """
@@ -187,10 +187,12 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
 
     Returns
     -------
-    None.
+    final_data: dataframe
+        templated_data into which common variables of new_data were merged.
 
     '''
     common_cols = new_data.columns.intersection(template_data.columns)
+
     new_data_subset = new_data.loc[:,common_cols]
     
     if "date_of_measurement" and "time_of_measurement" and level_col in common_cols:
@@ -201,6 +203,41 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
         keys=["date_of_measurement", "time_of_measurement"]
     else:
         keys=["date_of_measurement"]
+    
+    data_cols = [col for col in common_cols if col not in keys]
+
+    merged_data = pd.merge(template_data, new_data_subset, on = keys, how = 'outer', suffixes = ("_t", "_i"))
+
+    if overwrite:
+        for col in data_cols:
+            merged_data[col] = merged_data[f"{col}_i"].combine_first(merged_data[f"{col}_t"]) #creates combination columns that have the original names (stored in data_cols), containing value from new_data. Only if new_data has no value, use value from template_data.
+    else:
+        for col in data_cols:
+            merged_data[col] = merged_data[f"{col}_t"].combine_first(merged_data[f"{col}_i"]) #creates combination columns that have the original names (stored in data_cols), containing value from template_data. Only if template_data has no value, use value from new_data.
+
+    final_data = merged_data[template_data.columns] #drop colums that where created while merging and not needed after combining
+    
+    return final_data
+
+def write_combined_data_to_excel (combined_data, file_path, sheet_name):
+    '''
+    
+
+    Parameters
+    ----------
+    combined_data : TYPE
+        DESCRIPTION.
+    file_path : TYPE
+        DESCRIPTION.
+    sheet_name : TYPE
+        DESCRIPTION.
+
+    Returns
+    -------
+    None.
+
+    '''
+    
 
 def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None, overwrite =False):
     '''
@@ -220,7 +257,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     end_date : String
         Last date for which data should be exported in format yyyy-mm-dd.
     file_path: string
-        Path to the ICASA template file into which the data should be pasted.
+        Path to the ICASA template file into which the data should be pasted. This file will be partially overwritten so store a copy elsewhere to not risk of loosing data or the original template!
     level_col: string, optional
         Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
     overwrite: boolean, optional
@@ -263,12 +300,11 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     
     template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
     
-    
-    
-    #adapt from data_transform (evetually built more helper functions)
+    combined_data = merge_new_data_to_ICASA(data, template_data, level_col, overwrite)
         
-    
-    return data
+    write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name)
+
+
     
 
 input_file = "ICASA_for_agroforstry_draft_final.xlsx"
