@@ -237,7 +237,30 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name):
     None.
 
     '''
-    
+    wb = load_workbook(file_path)
+    ws = wb[sheet_name]
+
+    # Write new data starting at row 4
+    for r_idx, row in enumerate(dataframe_to_rows(combined_data, index=False, header=True), start=4):
+        for c_idx, value in enumerate(row, start=1):
+            ws.cell(row=r_idx, column=c_idx, value=value)
+
+    # get headers
+    header = [cell.value for cell in ws[4]]
+
+    # date_of_measurement column formatting
+    if "date_of_measurement" in header:
+        date_col_idx = header.index("date_of_measurement") + 1  # 1-based indexing
+        for row in ws.iter_rows(min_row=5, min_col=date_col_idx, max_col=date_col_idx):
+            row[0].number_format = "yyyy-mm-dd"
+
+    # time_of_measurement column formatting
+    if "time_of_measurement" in header:
+        time_col_idx = header.index("time_of_measurement") + 1
+        for row in ws.iter_rows(min_row=5, min_col=time_col_idx, max_col=time_col_idx):
+            row[0].number_format = "hh:mm:ss"
+
+    wb.save(file_path) 
 
 def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None, overwrite =False):
     '''
@@ -307,24 +330,11 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
 
     
 
-input_file = "ICASA_for_agroforstry_draft_final.xlsx"
-output_file = ""
+template_file = "ICASA_for_agroforstry_draft_final.xlsx"
 BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
-input_path = os.path.join(BASE_DIR, input_file)
-output_path = os.path.join(BASE_DIR, output_file)
-
-#Sheet_name_test = find_ICASA_sheet_by_variable_name("soil_water_by_layer", input_path)
+input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
-    
-    #data_LAI = data_by_valuetype(api, 34, 7, "2025-04-04", "2025-07-01")
-    #ICASA_soil_moisture = extract_ICASA_info(api, 10, 7)
-    #agg = ICASA_soil_moisture.get("aggregation")
-    #data_LAI_agg = agg_data_daily(data_LAI, "mean")
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-15", end_date="2025-10_20", file_path=input_file, level_col = "me_soil_layer_top_depth")
-    
-    #datasets_example = api.dataset.list(valuetype=10, project=7)
-    #data_example = api.dataset.values_parquet(dsid=3098, start="2025-10-10", end="2025-10-13")
-    #data_obj_example = api.dataset(dsid=3098)
-    #valuetype_obj_example = api.dataset.listobj(valuetype=10) #reveals many dataset objects, not the valuetype object
+
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-15", end_date="2025-10_20", file_path=template_file, level_col = "me_soil_layer_top_depth", overwrite = False)
     
