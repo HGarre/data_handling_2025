@@ -195,14 +195,9 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
 
     new_data_subset = new_data.loc[:,common_cols]
     
-    if "date_of_measurement" and "time_of_measurement" and level_col in common_cols:
-        keys=["date_of_measurement", "time_of_measurement", level_col]
-    elif "date_of_measurement" and level_col in common_cols:
-        keys=["date_of_measurement", level_col]
-    elif "date_of_measurement" and "time_of_measurement" in common_cols:
-        keys=["date_of_measurement", "time_of_measurement"]
-    else:
-        keys=["date_of_measurement"]
+    candidate_keys = ["date_of_measurement","time_of_measurement", level_col,]
+
+    keys = [k for k in candidate_keys if k in common_cols]
     
     data_cols = [col for col in common_cols if col not in keys]
 
@@ -330,7 +325,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
 
     
 
-template_file = "ICASA_for_agroforstry_draft_final.xlsx"
+template_file = "ICASA_for_agroforstry_input_test.xlsx"
 BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
 input_path = os.path.join(BASE_DIR, template_file)
 
