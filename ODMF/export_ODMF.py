@@ -195,7 +195,7 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
 
     new_data_subset = new_data.loc[:,common_cols]
     
-    candidate_keys = ["date_of_measurement","time_of_measurement", level_col,]
+    candidate_keys = ["sampling_location_number", "date_of_measurement","time_of_measurement", level_col]
 
     keys = [k for k in candidate_keys if k in common_cols]
     
@@ -217,15 +217,14 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
 def write_combined_data_to_excel (combined_data, file_path, sheet_name):
     '''
     
-
     Parameters
     ----------
-    combined_data : TYPE
-        DESCRIPTION.
-    file_path : TYPE
-        DESCRIPTION.
-    sheet_name : TYPE
-        DESCRIPTION.
+    combined_data : dataframe
+        Dataframe containing data from ODMF merged with the existing template data.
+    file_path: string
+        Path to the ICASA template file into which the data should be pasted. This file will be partially overwritten so store a copy elsewhere to not risk of loosing data or the original template!
+    sheet_name : string
+        Name of the sheet within the ICASA template file into which the data should be pasted.
 
     Returns
     -------
@@ -259,7 +258,6 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name):
 
 def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None, overwrite =False):
     '''
-    
 
     Parameters
     ----------
@@ -277,7 +275,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     file_path: string
         Path to the ICASA template file into which the data should be pasted. This file will be partially overwritten so store a copy elsewhere to not risk of loosing data or the original template!
     level_col: string, optional
-        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
+        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth). The default is None.
     overwrite: boolean, optional
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
     Returns
@@ -331,5 +329,5 @@ input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
 
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-15", end_date="2025-10_20", file_path=template_file, level_col = "me_soil_layer_top_depth", overwrite = False)
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10-15", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth", overwrite = False)
     
