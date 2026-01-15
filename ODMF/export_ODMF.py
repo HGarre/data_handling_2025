@@ -114,9 +114,9 @@ def extract_ICASA_info (api, valuetype_id, project_id):
 
     Returns
     -------
-    ICASA_dict : dictionary
-        dictionary containing the ICASA variable name, the unit conversion factor 
-        and the agrregation function for transform from the value_type to the ICASA variable_name.
+    all_info : list of dictionaries
+        dictionaries containing the ICASA variable name, the unit conversion factor 
+        and the agrregation function for transform from the value_type to the ICASA variable_name for each ICASA variable_name that is given in the ODMF comment.
         
     '''
     datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
@@ -135,13 +135,15 @@ def extract_ICASA_info (api, valuetype_id, project_id):
     re.VERBOSE | re.MULTILINE
     )
    
-    extraction=pattern.search(valuetype_info)
-    ICASA_dict=extraction.groupdict()
-   
-    factor = ICASA_dict.get("conversion")
-    ICASA_dict["conversion"]=float(factor) if factor else None
-   
-    return ICASA_dict
+    all_info = []
+    
+    for extraction in pattern.finditer(valuetype_info):
+        ICASA_dict=extraction.groupdict()
+        factor = ICASA_dict.get("conversion")
+        ICASA_dict["conversion"]=float(factor) if factor else None
+        all_info.append(ICASA_dict)
+        
+    return all_info
 
 def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     '''
@@ -297,38 +299,39 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
 
     '''
     try: 
-        ICASA_info = extract_ICASA_info(api, valuetype_id, project_id)
+        all_ICASA_infos = extract_ICASA_info(api, valuetype_id, project_id)
     except:
         raise ValueError("No ICASA info or datasets can be found for the given valuetype. Check whether (1) The given valuetype has an ICASA comment in ODMF, (2) datasets are present for the given valuetype and you have access to them via the project and api provided, and (3) you are connected to a network that gives you access to ODMF.")
+    
+    for ICASA_info in all_ICASA_infos:
+        ICASA_name = ICASA_info["Variable_name"]
+        ICASA_conversion = ICASA_info["conversion"]
+        ICASA_aggregation = ICASA_info["aggregation"]
         
-    ICASA_name = ICASA_info["Variable_name"]
-    ICASA_conversion = ICASA_info["conversion"]
-    ICASA_aggregation = ICASA_info["aggregation"]
-    
-    data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
-    
-    if data.empty:
-        raise ValueError("No datasets could be exported. Check whether (1) Datasets are present for the given valuetype and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
-    
-    if ICASA_conversion != None:
-       data["value"] = data["value"]/ICASA_conversion
-    
-    if ICASA_aggregation != None:
-        data = agg_data_daily(data, ICASA_aggregation)
-     
-    data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
+        data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
         
-    ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
-    
-    template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
-    
-    template_data[date_col]=pd.to_datetime(template_data[date_col])
-    if time_col in template_data.columns:
-        template_data[time_col]=pd.to_timedelta(template_data[time_col])
-    
-    combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
+        if data.empty:
+            raise ValueError("No datasets could be exported. Check whether (1) Datasets are present for the given valuetype and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
         
-    write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
+        if ICASA_conversion != None:
+           data["value"] = data["value"]/ICASA_conversion
+        
+        if ICASA_aggregation != None:
+            data = agg_data_daily(data, ICASA_aggregation)
+         
+        data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
+            
+        ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+        
+        template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
+        
+        template_data[date_col]=pd.to_datetime(template_data[date_col])
+        if time_col in template_data.columns:
+            template_data[time_col]=pd.to_timedelta(template_data[time_col])
+        
+        combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
+            
+        write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
 
     
 
@@ -338,5 +341,5 @@ input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
 
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-03-01", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
     
