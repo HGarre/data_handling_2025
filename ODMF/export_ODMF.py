@@ -61,6 +61,8 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
         level = dataset_obj["level"]
         data["level"]=level
         data_total = pd.concat([data_total, data], ignore_index = True)
+    data_total["date"]=data_total["time"].dt.normalize()
+    data_total["time"]=data_total["time"] - data_total["date"]
     return data_total
 
 def agg_data_daily(df, function_name):
@@ -86,14 +88,13 @@ def agg_data_daily(df, function_name):
     df
     .groupby(
         [
-            pd.Grouper(key='time', freq='D'),
+            pd.Grouper(key='date', freq='D'),
             'site',
             'level'
         ]
-    )['value']                                
-    .agg(function_name)                                    
+    )                              
+    .agg(value=("value", function_name),time=("time", "mean"))                                    
     .reset_index()                             
-    .rename(columns={'time': 'date'})
     )
     return data_summed
 
@@ -171,7 +172,7 @@ def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     
     return sheet_name
             
-def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrite=False):
+def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement", level_col = None, overwrite=False):
     '''
 
     Parameters
@@ -182,6 +183,12 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
         Containing the sheet of the template to which the new data should be added.
     level_col: string, optional
         Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
+    site_col: string, optional
+        Name of the column in the ICASA template into which ODMF site information should be pasted (e.g. weather_station_id). The default is sampling_location_number.
+    date_col: string, optional
+        Name of the column in the ICASA template into which ODMF date information should be pasted (e.g. weather_date). The default is date_of_measurement.
+    time_col: string, optional
+        Name of the column in the ICASA template into which time split from ODMF data information should be pasted. The default is time_of_measurement.
     overwrite : boolean, optional
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
 
@@ -195,7 +202,7 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
 
     new_data_subset = new_data.loc[:,common_cols]
     
-    candidate_keys = ["sampling_location_number", "date_of_measurement","time_of_measurement", level_col]
+    candidate_keys = [site_col, date_col, time_col, level_col]
 
     keys = [k for k in candidate_keys if k in common_cols]
     
@@ -214,7 +221,7 @@ def merge_new_data_to_ICASA (new_data, template_data, level_col = None, overwrit
     
     return final_data
 
-def write_combined_data_to_excel (combined_data, file_path, sheet_name):
+def write_combined_data_to_excel (combined_data, file_path, sheet_name, date_col = "date_of_measurement", time_col = "time_of_measurement"):
     '''
     
     Parameters
@@ -243,20 +250,20 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name):
     header = [cell.value for cell in ws[4]]
 
     # date_of_measurement column formatting
-    if "date_of_measurement" in header:
-        date_col_idx = header.index("date_of_measurement") + 1  # 1-based indexing
+    if date_col in header:
+        date_col_idx = header.index(date_col) + 1  # 1-based indexing
         for row in ws.iter_rows(min_row=5, min_col=date_col_idx, max_col=date_col_idx):
             row[0].number_format = "yyyy-mm-dd"
 
     # time_of_measurement column formatting
-    if "time_of_measurement" in header:
-        time_col_idx = header.index("time_of_measurement") + 1
+    if time_col in header:
+        time_col_idx = header.index(time_col) + 1
         for row in ws.iter_rows(min_row=5, min_col=time_col_idx, max_col=time_col_idx):
             row[0].number_format = "hh:mm:ss"
 
     wb.save(file_path) 
 
-def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, level_col = None, overwrite =False):
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False):
     '''
 
     Parameters
@@ -274,6 +281,12 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         Last date for which data should be exported in format yyyy-mm-dd.
     file_path: string
         Path to the ICASA template file into which the data should be pasted. This file will be partially overwritten so store a copy elsewhere to not risk of loosing data or the original template!
+    site_col: string, optional
+        Name of the column in the ICASA template into which ODMF site information should be pasted (e.g. weather_station_id). The default is sampling_location_number.
+    date_col: string, optional
+        Name of the column in the ICASA template into which ODMF date information should be pasted (e.g. weather_date). The default is date_of_measurement.
+    time_col: string, optional
+        Name of the column in the ICASA template into which time split from ODMF data information should be pasted. The default is time_of_measurement.
     level_col: string, optional
         Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth). The default is None.
     overwrite: boolean, optional
@@ -302,24 +315,16 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     
     if ICASA_aggregation != None:
         data = agg_data_daily(data, ICASA_aggregation)
-    else:
-        data = data.rename(columns={"time": "date_of_measurement"})
-    
-    if level_col == None:
-        data.drop("level", axis=1, inplace=True)
-    else: 
-       data = data.rename(columns={"level": level_col})
-        
-    data = data.rename(columns={"date": "date_of_measurement", "site": "sampling_location_number", "value": ICASA_name})
+     
+    data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
         
     ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
     
     template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
     
-    combined_data = merge_new_data_to_ICASA(data, template_data, level_col, overwrite)
+    combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
         
-    write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name)
-
+    write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
 
     
 
@@ -329,5 +334,5 @@ input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
 
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10-15", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth", overwrite = False)
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-15", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
     
