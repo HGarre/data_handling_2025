@@ -322,6 +322,10 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     
     template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
     
+    template_data[date_col]=pd.to_datetime(template_data[date_col])
+    if time_col in template_data.columns:
+        template_data[time_col]=pd.to_timedelta(template_data[time_col])
+    
     combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
         
     write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
@@ -334,5 +338,5 @@ input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
 
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-15", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-03-01", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
     
