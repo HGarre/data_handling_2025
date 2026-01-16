@@ -65,6 +65,41 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
     data_total["time"]=data_total["time"] - data_total["date"]
     return data_total
 
+def data_by_site(api, site_id, project_id, start_date, end_date):
+    '''
+    
+
+    Parameters
+    ----------
+    api : ?
+        Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
+    site_id : integer
+        ID given in the ODMF system to the site for which data should be exported.
+    project_id : integer
+        ID given in the ODMF system to the project from which data should be exported.
+    start_date : string
+        First date for which data should be exported in format yyyy-mm-dd.
+    end_date : string
+        Last date for which data should be exported in format yyyy-mm-dd.
+
+    Returns
+    -------
+    data_dict : TYPE
+        DESCRIPTION.
+
+    '''
+    datasets = api.dataset.list(site=site_id, project=project_id)
+    end_time = end_date+"T23:59:59Z"
+    data_dict = {}
+    for dataset_id in datasets:
+        data = api.dataset.values_parquet(dsid=dataset_id, start=start_date, end=end_time)
+        dataset_obj = api.dataset(dsid=dataset_id)
+        level = dataset_obj["level"]
+        data["level"]=level
+        valuetype_id = dataset_obj["valuetype"]["id"]
+        data_dict[valuetype_id] = data
+    return data_dict
+
 def agg_data_daily(df, function_name):
     """
     Aggregates data exported from ODMF e.g. by data_by_valuetype per day using the given aggregation function.
@@ -341,5 +376,5 @@ input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
 
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
-    
+    #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+    großmutz_weather = data_by_site(api, site_id = 3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06")
