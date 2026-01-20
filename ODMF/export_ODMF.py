@@ -65,9 +65,11 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
     data_total["time"]=data_total["time"] - data_total["date"]
     return data_total
 
+
 def data_by_site(api, site_id, project_id, start_date, end_date):
     '''
-    
+    Exports all data from a given site and a given project within ODMF database, between the start date and the end date (included),
+    as one dataset per valuetype sorted in a dictionary.
 
     Parameters
     ----------
@@ -102,6 +104,7 @@ def data_by_site(api, site_id, project_id, start_date, end_date):
         data_dict[valuetype_id] = data
     return data_dict
 
+
 def agg_data_daily(df, function_name):
     """
     Aggregates data exported from ODMF e.g. by data_by_valuetype per day using the given aggregation function.
@@ -135,10 +138,11 @@ def agg_data_daily(df, function_name):
     )
     return data_summed
 
+
 def extract_ICASA_info (api, valuetype_id, project_id):
     '''
     Extracts information about the ICASA variable corresponding to the given value_type.
-    For now only the first ICASA variable_name is extracted.
+    A list of all ICASA variables listed in the comment is returned.
 
     Parameters
     ----------
@@ -182,9 +186,10 @@ def extract_ICASA_info (api, valuetype_id, project_id):
         
     return all_info
 
+
 def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     '''
-    
+    Searches the given ICASA template workbook for the data sheet in which the gven ICASA valiable name is listed.
 
     Parameters
     ----------
@@ -211,8 +216,11 @@ def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     
     return sheet_name
             
+
 def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement", level_col = None, overwrite=False):
     '''
+    Merges data provided in the format as returned by the export functions (columns site, date, time, value and level)
+    into an ICASA template sheet. 
 
     Parameters
     ----------
@@ -220,14 +228,14 @@ def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_locati
         Containing the data to add to the template.
     template_data : dataframe
         Containing the sheet of the template to which the new data should be added.
-    level_col: string, optional
-        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
     site_col: string, optional
         Name of the column in the ICASA template into which ODMF site information should be pasted (e.g. weather_station_id). The default is sampling_location_number.
     date_col: string, optional
         Name of the column in the ICASA template into which ODMF date information should be pasted (e.g. weather_date). The default is date_of_measurement.
     time_col: string, optional
         Name of the column in the ICASA template into which time split from ODMF data information should be pasted. The default is time_of_measurement.
+    level_col: string, optional
+        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth)
     overwrite : boolean, optional
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
 
@@ -260,8 +268,11 @@ def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_locati
     
     return final_data
 
+
 def write_combined_data_to_excel (combined_data, file_path, sheet_name, date_col = "date_of_measurement", time_col = "time_of_measurement"):
     '''
+    Writes data in the format the ICASA template (as returned by merge_data_to_ICASA) 
+    to the given ICASA template Excel file while keeping the rest of the workbook unchanged.
     
     Parameters
     ----------
@@ -271,6 +282,10 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name, date_col
         Path to the ICASA template file into which the data should be pasted. This file will be partially overwritten so store a copy elsewhere to not risk of loosing data or the original template!
     sheet_name : string
         Name of the sheet within the ICASA template file into which the data should be pasted.
+    date_col: string, optional
+        Name of the column in the ICASA template into which ODMF date information should be pasted (e.g. weather_date). The default is date_of_measurement.
+    time_col: string, optional
+        Name of the column in the ICASA template into which time split from ODMF data information should be pasted. The default is time_of_measurement.
 
     Returns
     -------
@@ -302,8 +317,11 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name, date_col
 
     wb.save(file_path) 
 
+
 def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False):
     '''
+    Extracts data from the ODMF system for the given valuetype and project (all sites), 
+    converts it to the format of the given ICASA template and writes into the given ICASA file.
 
     Parameters
     ----------
@@ -380,8 +398,11 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
             
         write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
 
+
 def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_path, site_col= "weather_station_id", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False):
     '''
+    Extracts data from the ODMF system for the given site and project (all valuetypes), 
+    converts it to the format of the given ICASA template and writes into the given ICASA file.
 
     Parameters
     ----------
@@ -468,5 +489,5 @@ input_path = os.path.join(BASE_DIR, template_file)
 
 with login(url, username, password) as api:
 
-    #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
     ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06", file_path=template_file, date_col = "weather_date")
