@@ -97,6 +97,8 @@ def data_by_site(api, site_id, project_id, start_date, end_date):
         level = dataset_obj["level"]
         data["level"]=level
         valuetype_id = dataset_obj["valuetype"]["id"]
+        data["date"]=data["time"].dt.normalize()
+        data["time"]=data["time"] - data["date"]
         data_dict[valuetype_id] = data
     return data_dict
 
@@ -205,7 +207,7 @@ def find_ICASA_sheet_by_variable_name (variable_name, file_path):
             sheet_name = sheet
     
     if "sheet_name" not in locals():
-        raise ValueError("Variable name is not found in the provided ICASA template")
+        raise ValueError("Variable name is not found in the provided ICASA template (check for spaces!)")
     
     return sheet_name
             
@@ -346,7 +348,8 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
         
         if data.empty:
-            raise ValueError("No datasets could be exported. Check whether (1) Datasets are present for the given valuetype and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
+            print(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
+            continue
         
         if ICASA_conversion != None:
            data["value"] = data["value"]/ICASA_conversion
@@ -356,11 +359,20 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
          
         data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
             
-        ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+        try:
+            ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+        except:
+            print(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
+            continue
         
         template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
         
-        template_data[date_col]=pd.to_datetime(template_data[date_col])
+        try:
+            template_data[date_col]=pd.to_datetime(template_data[date_col])
+        except:
+            print(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
+            continue
+        
         if time_col in template_data.columns:
             template_data[time_col]=pd.to_timedelta(template_data[time_col])
         
@@ -368,7 +380,87 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
             
         write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
 
+def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_path, site_col= "weather_station_id", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False):
+    '''
+
+    Parameters
+    ----------
+    api : ?
+        Odmfclient login with url, username and password. Make sure that you have access to the data you want to export.
+    site_id : integer
+        ID given in the ODMF system to the site for which data should be exported.
+    project_id : integer
+        ID given in the ODMF system to the project from which data should be exported.
+        DESCRIPTION.
+    start_date : string
+        First date for which data should be exported in format yyyy-mm-dd.
+    end_date : String
+        Last date for which data should be exported in format yyyy-mm-dd.
+    file_path: string
+        Path to the ICASA template file into which the data should be pasted. This file will be partially overwritten so store a copy elsewhere to not risk of loosing data or the original template!
+    site_col: string, optional
+        Name of the column in the ICASA template into which ODMF site information should be pasted. The default is weather_station_id.
+    date_col: string, optional
+        Name of the column in the ICASA template into which ODMF date information should be pasted (e.g. weather_date). The default is date_of_measurement.
+    time_col: string, optional
+        Name of the column in the ICASA template into which time split from ODMF data information should be pasted. The default is time_of_measurement.
+    level_col: string, optional
+        Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth). The default is None.
+    overwrite: boolean, optional
+        Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
+    Returns
+    -------
+    None.
+
+    '''
+    data_dict = data_by_site(api, site_id, project_id, start_date, end_date)
     
+    for valuetype_id in data_dict:
+        all_ICASA_infos = extract_ICASA_info(api, valuetype_id, project_id)
+        
+        for ICASA_info in all_ICASA_infos:
+            ICASA_name = ICASA_info["Variable_name"]
+            ICASA_conversion = ICASA_info["conversion"]
+            ICASA_aggregation = ICASA_info["aggregation"]
+                
+            data = data_dict[valuetype_id]
+            data["site"] = site_id
+                
+            if data.empty:
+                print(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
+                continue
+                
+            if ICASA_conversion != None:
+                data["value"] = data["value"]/ICASA_conversion
+                
+            if ICASA_aggregation != None:
+                data = agg_data_daily(data, ICASA_aggregation)
+                 
+            data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
+                    
+            try:
+                ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
+            except:
+                print(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
+                continue
+                
+            template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
+                
+            try:
+                template_data[date_col]=pd.to_datetime(template_data[date_col])
+            except:
+                print(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
+                continue
+            
+            if time_col in template_data.columns:
+                template_data[time_col]=pd.to_timedelta(template_data[time_col])
+                
+            combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
+                    
+            write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)   
+
+
+
 
 template_file = "ICASA_for_agroforstry_input_test.xlsx"
 BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
@@ -377,4 +469,4 @@ input_path = os.path.join(BASE_DIR, template_file)
 with login(url, username, password) as api:
 
     #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=1, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
-    großmutz_weather = data_by_site(api, site_id = 3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06")
+    ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06", file_path=template_file, date_col = "weather_date")
