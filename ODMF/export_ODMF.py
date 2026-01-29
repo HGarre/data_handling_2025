@@ -4,9 +4,15 @@ Created on Mon Oct  6 16:25:49 2025
 Revised: Added config file for credentials
 
 @author: garre
-"""
 
-# FORMULA project id: 7
+This script exports data from the ODMF database and pastes it into an excel workbook template of the ICASA format provided by the user.
+The user can choose to provide either the id of a valuetype for which datasets from all available sites will be exported 
+or the id of a site for which datasets from all available valuetypes will the exportet. The program extracts the information about the corresponding
+ICASA variables names stored in the comment with each valuetype in ODMF, exports and summarized the corresponding datasets, 
+converts the units and aggregats the data to daily timesteps as specified in the comment, searched the provided template workbook 
+for the sheet in which the valuetype is stored and pastes the final data into the excel sheet while merging to data previously stored in the sheet.
+
+"""
 
 import os
 import configparser
@@ -16,17 +22,8 @@ import re
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 
-config_path = "config.ini"
-config = configparser.ConfigParser()
-config.read(config_path)
-
-url = config["odmf"]["url"]
-username = config["odmf"]["username"]
-password = config["odmf"]["password"]
-
-
     
-def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date): 
+def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd.DataFrame: 
     """
     Exports all data from a given ODMF database and a given project that stores 
     values of the given type, between the start date and the end date (included).
@@ -46,7 +43,7 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
 
     Returns
     -------
-    data_total : DataFrame
+    data_total : pd.DataFrame
         extracted data sorted by site, level, and time
 
     """
@@ -66,7 +63,7 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date):
     return data_total
 
 
-def data_by_site(api, site_id, project_id, start_date, end_date):
+def data_by_site(api, site_id, project_id, start_date, end_date) -> dict:
     '''
     Exports all data from a given site and a given project within ODMF database, between the start date and the end date (included),
     as one dataset per valuetype sorted in a dictionary.
@@ -86,8 +83,8 @@ def data_by_site(api, site_id, project_id, start_date, end_date):
 
     Returns
     -------
-    data_dict : TYPE
-        DESCRIPTION.
+    data_dict : dict
+        Dictionary of pd.DataFrames for each dataset stored for the site.
 
     '''
     datasets = api.dataset.list(site=site_id, project=project_id)
@@ -105,7 +102,7 @@ def data_by_site(api, site_id, project_id, start_date, end_date):
     return data_dict
 
 
-def agg_data_daily(df, function_name):
+def agg_data_daily(df, function_name) -> pd.DataFrame:
     """
     Aggregates data exported from ODMF e.g. by data_by_valuetype per day using the given aggregation function.
 
@@ -118,8 +115,8 @@ def agg_data_daily(df, function_name):
 
     Returns
     -------
-    data_summed : data_frame
-        DESCRIPTION.
+    data_summed : pd.DataFrame
+        DataFrame containing the aggregated data.
 
     """
     df["level"] = df["level"].fillna("None") #makes None a string to make grouping possible if there are no levels in the data
@@ -139,7 +136,7 @@ def agg_data_daily(df, function_name):
     return data_summed
 
 
-def extract_ICASA_info (api, valuetype_id, project_id):
+def extract_ICASA_info (api, valuetype_id, project_id) -> list:
     '''
     Extracts information about the ICASA variable corresponding to the given value_type.
     A list of all ICASA variables listed in the comment is returned.
@@ -187,7 +184,7 @@ def extract_ICASA_info (api, valuetype_id, project_id):
     return all_info
 
 
-def find_ICASA_sheet_by_variable_name (variable_name, file_path):
+def find_ICASA_sheet_by_variable_name (variable_name, file_path) -> str:
     '''
     Searches the given ICASA template workbook for the data sheet in which the gven ICASA valiable name is listed.
 
@@ -217,7 +214,7 @@ def find_ICASA_sheet_by_variable_name (variable_name, file_path):
     return sheet_name
             
 
-def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement", level_col = None, overwrite=False):
+def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement", level_col = None, overwrite=False) -> pd.DataFrame:
     '''
     Merges data provided in the format as returned by the export functions (columns site, date, time, value and level)
     into an ICASA template sheet. 
@@ -241,7 +238,7 @@ def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_locati
 
     Returns
     -------
-    final_data: dataframe
+    final_data: pd.DataFrame
         templated_data into which common variables of new_data were merged.
 
     '''
@@ -353,10 +350,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
     None.
 
     '''
-    try: 
-        all_ICASA_infos = extract_ICASA_info(api, valuetype_id, project_id)
-    except:
-        raise ValueError("No ICASA info or datasets can be found for the given valuetype. Check whether (1) The given valuetype has an ICASA comment in ODMF, (2) datasets are present for the given valuetype and you have access to them via the project and api provided, and (3) you are connected to a network that gives you access to ODMF.")
+    all_ICASA_infos = extract_ICASA_info(api, valuetype_id, project_id)
     
     for ICASA_info in all_ICASA_infos:
         ICASA_name = ICASA_info["Variable_name"]
@@ -481,13 +475,23 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
             write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)   
 
 
+if __name__ == "__main__":
+    
+    config_path = "config.ini"
+    config = configparser.ConfigParser()
+    config.read(config_path)
 
+    url = config["odmf"]["url"]
+    username = config["odmf"]["username"]
+    password = config["odmf"]["password"]
 
-template_file = "ICASA_for_agroforstry_input_test.xlsx"
-BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
-input_path = os.path.join(BASE_DIR, template_file)
-
-with login(url, username, password) as api:
-
-    ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
-    ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06", file_path=template_file, date_col = "weather_date")
+    template_file = "ICASA_for_agroforstry_input_test.xlsx"
+    BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
+    input_path = os.path.join(BASE_DIR, template_file)
+    
+    with login(url, username, password) as api:
+        
+        # FORMULA project id: 7
+    
+        ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+        ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06", file_path=template_file, date_col = "weather_date")
