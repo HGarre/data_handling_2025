@@ -21,6 +21,7 @@ import pandas as pd
 import re
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
+import logging
 
     
 def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd.DataFrame: 
@@ -360,7 +361,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
         
         if data.empty:
-            print(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
+            logging.warning(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
             continue
         
         if ICASA_conversion != None:
@@ -374,7 +375,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         try:
             ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
         except:
-            print(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
+            logging.waring(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
             continue
         
         template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
@@ -382,7 +383,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         try:
             template_data[date_col]=pd.to_datetime(template_data[date_col])
         except:
-            print(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
+            logging.warning(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
             continue
         
         if time_col in template_data.columns:
@@ -442,7 +443,7 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
             data["site"] = site_id
                 
             if data.empty:
-                print(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
+                logging.warning(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
                 continue
                 
             if ICASA_conversion != None:
@@ -456,7 +457,7 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
             try:
                 ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
             except:
-                print(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
+                logging.warning(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
                 continue
                 
             template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
@@ -464,7 +465,7 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
             try:
                 template_data[date_col]=pd.to_datetime(template_data[date_col])
             except:
-                print(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
+                logging.warning(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
                 continue
             
             if time_col in template_data.columns:
@@ -493,5 +494,5 @@ if __name__ == "__main__":
         
         # FORMULA project id: 7
     
-        ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+        #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
         ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06", file_path=template_file, date_col = "weather_date")
