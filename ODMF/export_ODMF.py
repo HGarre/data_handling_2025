@@ -15,7 +15,7 @@ for the sheet in which the valuetype is stored and pastes the final data into th
 """
 
 import os
-import configparser
+import yaml
 from odmfclient import login
 import pandas as pd
 import re
@@ -477,14 +477,22 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
 
 
 if __name__ == "__main__":
-    
-    config_path = "config.ini"
-    config = configparser.ConfigParser()
-    config.read(config_path)
+    config_path = "config.yaml"
+    try:
+        with open(config_path, "r", encoding="utf-8") as cf:
+            cfg = yaml.safe_load(cf)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Config file '{config_path}' not found. ")
 
-    url = config["odmf"]["url"]
-    username = config["odmf"]["username"]
-    password = config["odmf"]["password"]
+    if cfg is None:
+        raise ValueError(f"Config file '{config_path}' is empty or invalid YAML")
+
+    # allow either top-level keys or nested under 'odmf'
+    odmf_cfg = cfg.get("odmf", cfg)
+
+    url = odmf_cfg["url"]
+    username = odmf_cfg["username"]
+    password = odmf_cfg["password"]
 
     template_file = "ICASA_for_agroforstry_input_test.xlsx"
     BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run

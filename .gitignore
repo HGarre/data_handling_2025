@@ -8,3 +8,4 @@
 *.labimport
 .venv
 ODMF/config.ini
+ODMF/config.yaml
