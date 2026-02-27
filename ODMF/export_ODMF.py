@@ -11,6 +11,7 @@ or the id of a site for which datasets from all available valuetypes will the ex
 ICASA variables names stored in the comment with each valuetype in ODMF, exports and summarized the corresponding datasets, 
 converts the units and aggregats the data to daily timesteps as specified in the comment, searched the provided template workbook 
 for the sheet in which the valuetype is stored and pastes the final data into the excel sheet while merging to data previously stored in the sheet.
+Users should create a yaml file that stores there ODMF credentials (url, username and password) and provide the path to this file in the main function.
 
 """
 
@@ -53,12 +54,13 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd
     end_time = end_date+"T23:59:59Z"
     for dataset_id in datasets:
         data = api.dataset.values_parquet(dsid=dataset_id, start=start_date, end=end_time)
-        dataset_obj = api.dataset(dsid=dataset_id)
-        site = dataset_obj["site"]["id"]
-        data["site"]=site
-        level = dataset_obj["level"]
-        data["level"]=level
-        data_total = pd.concat([data_total, data], ignore_index = True)
+        if not data.empty:
+            dataset_obj = api.dataset(dsid=dataset_id)
+            site = dataset_obj["site"]["id"]
+            data["site"]=site
+            level = dataset_obj["level"]
+            data["level"]=level
+            data_total = pd.concat([data_total, data], ignore_index = True)
     data_total["date"]=data_total["time"].dt.normalize()
     data_total["time"]=data_total["time"] - data_total["date"]
     return data_total
@@ -93,13 +95,14 @@ def data_by_site(api, site_id, project_id, start_date, end_date) -> dict:
     data_dict = {}
     for dataset_id in datasets:
         data = api.dataset.values_parquet(dsid=dataset_id, start=start_date, end=end_time)
-        dataset_obj = api.dataset(dsid=dataset_id)
-        level = dataset_obj["level"]
-        data["level"]=level
-        valuetype_id = dataset_obj["valuetype"]["id"]
-        data["date"]=data["time"].dt.normalize()
-        data["time"]=data["time"] - data["date"]
-        data_dict[valuetype_id] = data
+        if not data.empty:
+            dataset_obj = api.dataset(dsid=dataset_id)
+            level = dataset_obj["level"]
+            data["level"]=level
+            valuetype_id = dataset_obj["valuetype"]["id"]
+            data["date"]=data["time"].dt.normalize()
+            data["time"]=data["time"] - data["date"]
+            data_dict[valuetype_id] = data
     return data_dict
 
 
@@ -478,17 +481,10 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
 
 if __name__ == "__main__":
     config_path = "config.yaml"
-    try:
-        with open(config_path, "r", encoding="utf-8") as cf:
-            cfg = yaml.safe_load(cf)
-    except FileNotFoundError:
-        raise FileNotFoundError(f"Config file '{config_path}' not found. ")
+    with open(config_path, "r", encoding="utf-8") as cf:
+        cfg = yaml.safe_load(cf)
 
-    if cfg is None:
-        raise ValueError(f"Config file '{config_path}' is empty or invalid YAML")
-
-    # allow either top-level keys or nested under 'odmf'
-    odmf_cfg = cfg.get("odmf", cfg)
+    odmf_cfg = cfg.get("odmf", cfg)  # allow either top-level keys or nested under 'odmf'
 
     url = odmf_cfg["url"]
     username = odmf_cfg["username"]
@@ -502,5 +498,5 @@ if __name__ == "__main__":
         
         # FORMULA project id: 7
     
-        #ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10_18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
-        ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-01-03", end_date="2026-01-06", file_path=template_file, date_col = "weather_date")
+        ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
+        ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-02-19", end_date="2026-02-26", file_path=template_file, date_col = "weather_date")
