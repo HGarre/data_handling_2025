@@ -432,6 +432,7 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
     None.
 
     '''
+
     data_dict = data_by_site(api, site_id, project_id, start_date, end_date)
     
     for valuetype_id in data_dict:
@@ -480,7 +481,10 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
 
 
 if __name__ == "__main__":
-    config_path = "config.yaml"
+    project_dir = os.path.abspath(os.path.dirname(__file__))
+    data_dir = os.path.join(project_dir, "../ODMF")
+    
+    config_path = os.path.join(data_dir, "config.yaml")
     with open(config_path, "r", encoding="utf-8") as cf:
         cfg = yaml.safe_load(cf)
 
@@ -491,12 +495,11 @@ if __name__ == "__main__":
     password = odmf_cfg["password"]
 
     template_file = "ICASA_for_agroforstry_input_test.xlsx"
-    BASE_DIR = os.path.abspath(os.path.dirname(__file__)) #do not run this line alone, only works when entire scrip is run
-    input_path = os.path.join(BASE_DIR, template_file)
+    input_path = os.path.join(data_dir, template_file)
     
     with login(url, username, password) as api:
         
         # FORMULA project id: 7
     
-        ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-18", end_date="2025-10-20", file_path=template_file, level_col = "me_soil_layer_top_depth")
-        ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-02-19", end_date="2026-02-26", file_path=template_file, date_col = "weather_date")
+        ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-18", end_date="2025-10-20", file_path=input_path, level_col = "me_soil_layer_top_depth")
+        #ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-02-19", end_date="2026-02-26", file_path=input_path, date_col = "weather_date")
