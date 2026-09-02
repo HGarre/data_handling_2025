@@ -140,6 +140,45 @@ def agg_data_daily(df, function_name) -> pd.DataFrame:
     return data_summed
 
 
+def agg_data_hourly(df, function_name) -> pd.DataFrame:
+    """
+    Aggregates data exported from ODMF e.g. by data_by_valuetype per hour using the hour of the time column.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        A dataframe containing values sorted by site, level and time.
+    function_name : string
+        An aggregation function such as mean, sum, min, max.
+
+    Returns
+    -------
+    data_summed : pd.DataFrame
+        DataFrame containing the aggregated data by hour of day.
+
+    """
+    df["level"] = df["level"].fillna("None")
+    df["hour"] = df["time"].dt.components.hours
+
+    data_summed = (
+    df
+    .groupby(
+        [
+            'date',
+            'hour',
+            'site',
+            'level'
+        ]
+    )                              
+    .agg(value=("value", function_name))                                    
+    .reset_index()                             
+    )
+
+    data_summed["time"] = pd.to_timedelta(data_summed["hour"], unit="h")
+    data_summed = data_summed.drop(columns=["hour"])
+    return data_summed
+
+
 def extract_ICASA_info (api, valuetype_id, project_id) -> list:
     '''
     Extracts information about the ICASA variable corresponding to the given value_type.
@@ -319,7 +358,7 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name, date_col
     wb.save(file_path) 
 
 
-def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False):
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False, aggregate = "daily"):
     '''
     Extracts data from the ODMF system for the given valuetype and project (all sites), 
     converts it to the format of the given ICASA template and writes into the given ICASA file.
@@ -349,6 +388,9 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth). The default is None.
     overwrite: boolean, optional
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
+    aggregate: string, optional
+        The aggregation function to use for aggregating the data. The default is "daily".
+
     Returns
     -------
     None.
@@ -371,8 +413,11 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
            data["value"] = data["value"]/ICASA_conversion
         
         if ICASA_aggregation != None:
-            data = agg_data_daily(data, ICASA_aggregation)
-         
+            if aggregate == "daily":
+                data = agg_data_daily(data, ICASA_aggregation)
+            elif aggregate == "hourly":
+                data = agg_data_hourly(data, ICASA_aggregation)
+
         data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
             
         try:
@@ -390,14 +435,14 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
             continue
         
         if time_col in template_data.columns:
-            template_data[time_col]=pd.to_timedelta(template_data[time_col])
+            template_data[time_col]=pd.to_timedelta(template_data[time_col], unit = "h")
         
         combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
             
         write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
 
 
-def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_path, site_col= "weather_station_id", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False):
+def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_path, site_col= "weather_station_id", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False, aggregate = "daily"):
     '''
     Extracts data from the ODMF system for the given site and project (all valuetypes), 
     converts it to the format of the given ICASA template and writes into the given ICASA file.
@@ -427,6 +472,8 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
         Name of the column in the ICASA template into which ODMF layer information should be pasted (e.g. me_soil_layer_bot_depth). The default is None.
     overwrite: boolean, optional
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
+    aggregate: string, optional
+        The aggregation interval to use for the exported data. Supported values are "daily" and "hourly". The default is "daily".
     Returns
     -------
     None.
@@ -454,8 +501,11 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
                 data["value"] = data["value"]/ICASA_conversion
                 
             if ICASA_aggregation != None:
-                data = agg_data_daily(data, ICASA_aggregation)
-                 
+                if aggregate == "daily":
+                    data = agg_data_daily(data, ICASA_aggregation)
+                elif aggregate == "hourly":
+                    data = agg_data_hourly(data, ICASA_aggregation)
+
             data = data.rename(columns={"date": date_col, "time": time_col, "site": site_col, "level": level_col, "value": ICASA_name})
                     
             try:
@@ -484,7 +534,7 @@ if __name__ == "__main__":
     project_dir = os.path.abspath(os.path.dirname(__file__))
     data_dir = os.path.join(project_dir, "../ODMF")
     
-    config_path = os.path.join(data_dir, "config.yaml")
+    config_path = os.path.join(data_dir,"config.yaml")
     with open(config_path, "r", encoding="utf-8") as cf:
         cfg = yaml.safe_load(cf)
 
@@ -494,12 +544,17 @@ if __name__ == "__main__":
     username = odmf_cfg["username"]
     password = odmf_cfg["password"]
 
-    template_file = "ICASA_for_agroforstry_input_test.xlsx"
+    template_file = "ICASA_for_statistics_08_12.xlsx"
     input_path = os.path.join(data_dir, template_file)
     
     with login(url, username, password) as api:
+
         
         # FORMULA project id: 7
-    
-        ICASA_test_output = data_to_ICASA_by_valuetype(api, valuetype_id=10, project_id=7, start_date="2025-10-18", end_date="2025-10-20", file_path=input_path, level_col = "me_soil_layer_top_depth")
-        #ICASA_weather_test_output = data_to_ICASA_by_site(api, site_id=3817, project_id=None, start_date="2026-02-19", end_date="2026-02-26", file_path=input_path, date_col = "weather_date")
+
+        #soil_data = data_by_valuetype(api, 10, 7, "2025-10-18", "2025-10-20")
+        #soil_data.to_excel(os.path.join(project_dir, "soil_data.xlsx"), index=False)
+        Hourly_soil_data = data_to_ICASA_by_valuetype(api, valuetype_id=17, project_id=2, start_date="2022-04-16", end_date="2026-06-01", file_path=input_path, level_col = "me_soil_layer_top_depth", aggregate = "hourly")
+        
+        #export_for_statistics = data_to_ICASA_by_valuetype(api, valuetype_id=16, project_id=7, start_date="2026-05-01", end_date="2026-08-11", file_path=input_path, aggregate = "daily", level_col="level")
+        #temp_for_statistics = data_to_ICASA_by_site(api, site_id=1, project_id=None, start_date="2026-05-01", end_date="2026-08-11", file_path=input_path, site_col="sampling_location_number", date_col = "date_of_measurement", time_col="time_of_measurement", aggregate="hourly")
