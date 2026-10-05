@@ -23,9 +23,38 @@ import re
 from openpyxl import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 import logging
+from zoneinfo import ZoneInfo
+
+
+def normalize_time_zone(data: pd.DataFrame, timezone: str = "Europe/Berlin") -> pd.DataFrame:
+    """
+    Convert the dataframe's 'time' column to the provided timezone.
+
+    For timezone-aware timestamps, tz_convert is used. For timezone-naive
+    timestamps, tz_localize is used to assume they are already in the selected timezone.
+
+    Parameters
+    ----------
+    data : pd.DataFrame
+        DataFrame containing a 'time' column with timestamps.
+    timezone : str, optional
+        Timezone to which the timestamps should be converted. Default is "Europe/Berlin".
+
+    """
+    try:
+        tz = ZoneInfo(timezone)
+    except Exception as exc:
+        raise ValueError(f"Invalid timezone: {timezone}") from exc
+
+    series = pd.to_datetime(data["time"])
+    if getattr(series.dt, "tz", None) is not None:
+        data["time"] = series.dt.tz_convert(tz)
+    else:
+        data["time"] = series.dt.tz_localize(tz)
+    return data
 
     
-def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd.DataFrame: 
+def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date, timezone: str = "Europe/Berlin") -> pd.DataFrame: 
     """
     Exports all data from a given ODMF database and a given project that stores 
     values of the given type, between the start date and the end date (included).
@@ -42,6 +71,8 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd
         First date for which data should be exported in format yyyy-mm-dd.
     end_date : string
         Last date for which data should be exported in format yyyy-mm-dd.
+    timezone : str, optional
+        Timezone to which the exported timestamps should be converted before deriving local date and time.Default is "Europe/Berlin".
 
     Returns
     -------
@@ -51,7 +82,11 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd
     """
     datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
     data_total = pd.DataFrame(columns=["time", "value", "site", "level"])
-    end_time = end_date+"T23:59:59Z"
+    # Convert user's local midnight to UTC window for API (always UTC with Z suffix)
+    start_dt = pd.to_datetime(start_date).tz_localize(timezone).tz_convert("UTC")
+    start_date = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_dt = pd.to_datetime(end_date + "T23:59:59").tz_localize(timezone).tz_convert("UTC")
+    end_time = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     for dataset_id in datasets:
         data = api.dataset.values_parquet(dsid=dataset_id, start=start_date, end=end_time)
         if not data.empty:
@@ -60,13 +95,16 @@ def data_by_valuetype(api, valuetype_id, project_id, start_date, end_date) -> pd
             data["site"]=site
             level = dataset_obj["level"]
             data["level"]=level
+            data = normalize_time_zone(data, timezone)
             data_total = pd.concat([data_total, data], ignore_index = True)
-    data_total["date"]=data_total["time"].dt.normalize()
-    data_total["time"]=data_total["time"] - data_total["date"]
+    if not data_total.empty:
+        data_total["date"]=data_total["time"].dt.normalize()
+        data_total["time"]=data_total["time"] - data_total["date"]
+        data_total["date"] = data_total["date"].dt.tz_localize(None)
     return data_total
 
 
-def data_by_site(api, site_id, project_id, start_date, end_date) -> dict:
+def data_by_site(api, site_id, project_id, start_date, end_date, timezone: str = "Europe/Berlin") -> dict:
     '''
     Exports all data from a given site and a given project within ODMF database, between the start date and the end date (included),
     as one dataset per valuetype sorted in a dictionary.
@@ -83,6 +121,8 @@ def data_by_site(api, site_id, project_id, start_date, end_date) -> dict:
         First date for which data should be exported in format yyyy-mm-dd.
     end_date : string
         Last date for which data should be exported in format yyyy-mm-dd.
+    timezone : str, optional
+        Timezone to which the exported timestamps should be converted before deriving local date and time. Default is "Europe/Berlin".
 
     Returns
     -------
@@ -91,7 +131,11 @@ def data_by_site(api, site_id, project_id, start_date, end_date) -> dict:
 
     '''
     datasets = api.dataset.list(site=site_id, project=project_id)
-    end_time = end_date+"T23:59:59Z"
+    # Convert user's local midnight to UTC window for API (always UTC with Z suffix)
+    start_dt = pd.to_datetime(start_date).tz_localize(timezone).tz_convert("UTC")
+    start_date = start_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
+    end_dt = pd.to_datetime(end_date + "T23:59:59").tz_localize(timezone).tz_convert("UTC")
+    end_time = end_dt.strftime("%Y-%m-%dT%H:%M:%SZ")
     data_dict = {}
     for dataset_id in datasets:
         data = api.dataset.values_parquet(dsid=dataset_id, start=start_date, end=end_time)
@@ -100,8 +144,10 @@ def data_by_site(api, site_id, project_id, start_date, end_date) -> dict:
             level = dataset_obj["level"]
             data["level"]=level
             valuetype_id = dataset_obj["valuetype"]["id"]
+            data = normalize_time_zone(data, timezone)
             data["date"]=data["time"].dt.normalize()
             data["time"]=data["time"] - data["date"]
+            data["date"] = data["date"].dt.tz_localize(None)
             data_dict[valuetype_id] = data
     return data_dict
 
@@ -201,7 +247,7 @@ def extract_ICASA_info (api, valuetype_id, project_id) -> list:
         
     '''
     datasets = api.dataset.list(valuetype=valuetype_id, project=project_id)
-    first_dataset = datasets[1]
+    first_dataset = datasets[0]
     first_dataset_obj = api.dataset(dsid=first_dataset)
     valuetype_info =first_dataset_obj["valuetype"]["comment"]
    
@@ -296,6 +342,7 @@ def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_locati
     data_cols = [col for col in common_cols if col not in keys]
 
     merged_data = pd.merge(template_data, new_data_subset, on = keys, how = 'outer', suffixes = ("_t", "_i"))
+    merged_data.drop_duplicates(inplace=True)
 
     if overwrite:
         for col in data_cols:
@@ -305,6 +352,7 @@ def merge_new_data_to_ICASA (new_data, template_data, site_col= "sampling_locati
             merged_data[col] = merged_data[f"{col}_t"].combine_first(merged_data[f"{col}_i"]) #creates combination columns that have the original names (stored in data_cols), containing value from template_data. Only if template_data has no value, use value from new_data.
 
     final_data = merged_data[template_data.columns] #drop colums that where created while merging and not needed after combining
+    final_data.drop_duplicates(inplace=True)
     
     return final_data
 
@@ -358,7 +406,7 @@ def write_combined_data_to_excel (combined_data, file_path, sheet_name, date_col
     wb.save(file_path) 
 
 
-def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False, aggregate = "daily"):
+def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_date, file_path, site_col= "sampling_location_number", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False, aggregate = "daily", timezone: str = "Europe/Berlin"):
     '''
     Extracts data from the ODMF system for the given valuetype and project (all sites), 
     converts it to the format of the given ICASA template and writes into the given ICASA file.
@@ -390,6 +438,8 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
     aggregate: string, optional
         The aggregation function to use for aggregating the data. The default is "daily".
+    timezone : str, optional
+        Timezone in which the ODMF timestamps are normalized before aggregation and export. Default is "Europe/Berlin".
 
     Returns
     -------
@@ -403,7 +453,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         ICASA_conversion = ICASA_info["conversion"]
         ICASA_aggregation = ICASA_info["aggregation"]
         
-        data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date)
+        data = data_by_valuetype(api, valuetype_id, project_id, start_date, end_date, timezone=timezone)
         
         if data.empty:
             logging.warning(f"No dataset could be exported for {ICASA_name}. Check whether (1) Datasets are present for the given site and you have access to them via the project and api provided, (2) the datsets have entries in the time span you provided, and (3) you are connected to a network that gives you access to ODMF.")
@@ -423,7 +473,7 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
         try:
             ICASA_sheet_name = find_ICASA_sheet_by_variable_name(ICASA_name, file_path)
         except:
-            logging.waring(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
+            logging.warning(f"No sheet with the variable {ICASA_name} could be found in the template. Skipped {ICASA_name}")
             continue
         
         template_data = pd.read_excel(file_path, sheet_name=ICASA_sheet_name, skiprows=3)
@@ -434,15 +484,21 @@ def data_to_ICASA_by_valuetype (api, valuetype_id, project_id, start_date, end_d
             logging.warning(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
             continue
         
-        if time_col in template_data.columns:
-            template_data[time_col]=pd.to_timedelta(template_data[time_col], unit = "h")
+        if time_col in template_data.columns and template_data[time_col].dtype != 'timedelta64[ns]':
+            template_data[time_col]=template_data[time_col].astype('string')
+            template_data[time_col]=template_data[time_col].astype('timedelta64[ns]')
+        
+        if level_col is not None and level_col in template_data.columns:
+            template_data[level_col] = pd.to_numeric(template_data[level_col], errors='coerce')
+        if level_col is not None and level_col in data.columns:
+            data[level_col] = pd.to_numeric(data[level_col], errors='coerce')
         
         combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
             
         write_combined_data_to_excel(combined_data, file_path, ICASA_sheet_name, date_col, time_col)
 
 
-def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_path, site_col= "weather_station_id", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False, aggregate = "daily"):
+def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_path, site_col= "weather_station_id", date_col = "date_of_measurement", time_col = "time_of_measurement",  level_col = None, overwrite =False, aggregate = "daily", timezone: str = "Europe/Berlin"):
     '''
     Extracts data from the ODMF system for the given site and project (all valuetypes), 
     converts it to the format of the given ICASA template and writes into the given ICASA file.
@@ -474,13 +530,15 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
         Switch to allow overwriting existing values in the ICASA template with new data. The default is False.
     aggregate: string, optional
         The aggregation interval to use for the exported data. Supported values are "daily" and "hourly". The default is "daily".
+    timezone : str, optional
+        Timezone in which the ODMF timestamps are normalized before aggregation and export. Default is "Europe/Berlin".
     Returns
     -------
     None.
 
     '''
 
-    data_dict = data_by_site(api, site_id, project_id, start_date, end_date)
+    data_dict = data_by_site(api, site_id, project_id, start_date, end_date, timezone=timezone)
     
     for valuetype_id in data_dict:
         all_ICASA_infos = extract_ICASA_info(api, valuetype_id, project_id)
@@ -522,8 +580,14 @@ def data_to_ICASA_by_site (api, site_id, project_id, start_date, end_date, file_
                 logging.warning(f"there is no {date_col} in the same sheet as {ICASA_name}. Skipped {ICASA_name}")
                 continue
             
-            if time_col in template_data.columns:
-                template_data[time_col]=pd.to_timedelta(template_data[time_col])
+            if time_col in template_data.columns and template_data[time_col].dtype != 'timedelta64[ns]':
+                        template_data[time_col]=template_data[time_col].astype('string')
+                        template_data[time_col]=template_data[time_col].astype('timedelta64[ns]')
+            
+            if level_col is not None and level_col in template_data.columns:
+                template_data[level_col] = pd.to_numeric(template_data[level_col], errors='coerce')
+            if level_col is not None and level_col in data.columns:
+                data[level_col] = pd.to_numeric(data[level_col], errors='coerce')
                 
             combined_data = merge_new_data_to_ICASA(data, template_data, site_col, date_col, time_col, level_col, overwrite)
                     
@@ -534,7 +598,7 @@ if __name__ == "__main__":
     project_dir = os.path.abspath(os.path.dirname(__file__))
     data_dir = os.path.join(project_dir, "../ODMF")
     
-    config_path = os.path.join(data_dir,"config.yaml")
+    config_path = os.path.join(data_dir,"config_debug.yaml")
     with open(config_path, "r", encoding="utf-8") as cf:
         cfg = yaml.safe_load(cf)
 
@@ -544,7 +608,7 @@ if __name__ == "__main__":
     username = odmf_cfg["username"]
     password = odmf_cfg["password"]
 
-    template_file = "ICASA_for_statistics_08_12.xlsx"
+    template_file = "ICASA_for_agroforestry_input_test.xlsx"
     input_path = os.path.join(data_dir, template_file)
     
     with login(url, username, password) as api:
@@ -554,7 +618,18 @@ if __name__ == "__main__":
 
         #soil_data = data_by_valuetype(api, 10, 7, "2025-10-18", "2025-10-20")
         #soil_data.to_excel(os.path.join(project_dir, "soil_data.xlsx"), index=False)
-        Hourly_soil_data = data_to_ICASA_by_valuetype(api, valuetype_id=17, project_id=2, start_date="2022-04-16", end_date="2026-06-01", file_path=input_path, level_col = "me_soil_layer_top_depth", aggregate = "hourly")
+        #Hourly_soil_data = data_to_ICASA_by_valuetype(api, valuetype_id=17, project_id=2, start_date="2022-04-16", end_date="2026-06-01", file_path=input_path, level_col = "me_soil_layer_top_depth", aggregate = "hourly")
         
-        #export_for_statistics = data_to_ICASA_by_valuetype(api, valuetype_id=16, project_id=7, start_date="2026-05-01", end_date="2026-08-11", file_path=input_path, aggregate = "daily", level_col="level")
-        #temp_for_statistics = data_to_ICASA_by_site(api, site_id=1, project_id=None, start_date="2026-05-01", end_date="2026-08-11", file_path=input_path, site_col="sampling_location_number", date_col = "date_of_measurement", time_col="time_of_measurement", aggregate="hourly")
+        #export_for_statistics = data_to_ICASA_by_valuetype(api, valuetype_id=53, project_id=7, start_date="2026-05-15", end_date="2026-05-16", file_path=input_path, aggregate = None, level_col="level")
+        #temp_for_statistics = data_to_ICASA_by_site(api, site_id=4000, project_id=None, start_date="2026-05-15", end_date="2026-05-16", file_path=input_path, site_col="sampling_location_number", date_col = "date_of_measurement", time_col="time_of_measurement", aggregate="None")
+        
+        #data_test = api.dataset.values_parquet(dsid="4691", start="2026-05-01", end="2026-09-01")
+        #print(data_test)
+
+        #dataset_object = api.dataset(dsid="4691")
+        #print(dataset_object.keys())
+
+        #list_test = api.dataset.list(valuetype=53, project=7)
+        #print(list_test)
+
+        test_export = data_to_ICASA_by_valuetype(api, valuetype_id=4, project_id=1, start_date="2026-06-24", end_date="2026-06-24", file_path=input_path, aggregate = None, level_col=None, site_col="weather_station_id", date_col="weather_date", time_col="time_of_measurement", timezone="Etc/GMT-1")
